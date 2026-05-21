@@ -317,18 +317,14 @@
   <div class="login-page" id="loginPage">
     <div class="login-card">
       <h1>诊断系统管理后台</h1>
-      <p>登录后查看客户提交的自诊数据</p>
+      <p>输入密码查看客户提交数据</p>
       <form id="loginForm">
         <div class="field-group">
-          <label>邮箱</label>
-          <input type="email" id="loginEmail" placeholder="admin@example.com" required>
+          <label>管理密码</label>
+          <input type="password" id="loginPassword" placeholder="请输入管理员密码" required>
         </div>
-        <div class="field-group">
-          <label>密码</label>
-          <input type="password" id="loginPassword" placeholder="输入密码" required>
-        </div>
-        <button type="submit" class="btn-login" id="btnLogin">登录</button>
-        <div class="login-error" id="loginError">登录失败，请检查邮箱和密码</div>
+        <button type="submit" class="btn-login" id="btnLogin">进入后台</button>
+        <div class="login-error" id="loginError">密码错误，请重试</div>
       </form>
     </div>
   </div>
@@ -340,7 +336,7 @@
     <div class="app-header">
       <h1>📋 客户自诊数据</h1>
       <div class="user-info">
-        <span id="userEmail"></span>
+        <span id="userEmail">管理员</span>
         <button class="btn-logout" id="btnLogout">退出登录</button>
       </div>
     </div>
@@ -416,7 +412,6 @@
     const loginPage = document.getElementById('loginPage');
     const appLayout = document.getElementById('appLayout');
     const loginForm = document.getElementById('loginForm');
-    const loginEmail = document.getElementById('loginEmail');
     const loginPassword = document.getElementById('loginPassword');
     const btnLogin = document.getElementById('btnLogin');
     const loginError = document.getElementById('loginError');
@@ -466,7 +461,6 @@
     function showApp() {
       loginPage.style.display = 'none';
       appLayout.style.display = 'block';
-      userEmail.textContent = currentUser?.email || '';
       loadData();
     }
 
