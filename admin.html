@@ -137,16 +137,10 @@ document.getElementById('modal').onclick = function(e) { if (e.target === this) 
 // ===== 导出CSV =====
 function exportCSV() {
   if (all.length === 0) { alert('没有数据可导出'); return; }
-  var keys = ['store_name','owner_name','phone','category','open_time','employees','monthly_revenue','rent','location','area',
-    'q1_flow_people','q2_flow_reason','q3_flow_tracking','q4_conversion_rate','q5_loss_reason','q6_stay_time',
-    'q7_profit_clarity','q8_cost_awareness','q9_product_margin','q10_marketing_budget','q11_marketing_effect','q12_marketing_channels',
-    'q13_return_rate','q14_retention_method','q15_churn_reason','q16_owner_hours','q17_operation_without_owner','q18_sop_status',
-    'main_problem','expected_gain','self_diagnosis','notes','status','created_at'];
-  var labels = ['店铺名称','老板姓名','手机号','品类','开业时长','员工人数','月营业额','月租金','店铺位置','经营面积',
-    '每天进店人数','客流不足原因','门前客流统计','成交率','未成交原因','停留时长关注',
-    '利润核算','成本了解','产品利润率','月推广投入','效果判断','推广渠道',
-    '回头客比例','维护方式','流失原因','老板在店时长','离店运转情况','SOP标准化',
-    '最大问题','期望月增收','自诊结果','备注','状态','提交时间'];
+  var keys = ['store_name','owner_name','phone','form_version','category','open_time','employees','monthly_revenue','rent','location',
+    'main_problem','expected_gain','status','created_at'];
+  var labels = ['店铺名称','老板姓名','手机号','表单版本','品类','开业时长','员工人数','月营业额','月租金','店铺位置',
+    '最大问题','期望月增收','状态','提交时间'];
   var rows = all.map(function(d) {
     var arr = keys.map(function(k) {
       var v = d[k] || '';
@@ -212,7 +206,7 @@ function render() {
 
 function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-// ===== 查看详情 =====
+// ===== 查看详情（同时支持旧版Q1-Q18和新版v2 form_data）=====
 async function view(id) {
   var d = all.find(function(x) { return x.id === id; });
   if (!d) return;
@@ -226,23 +220,78 @@ async function view(id) {
       render();
     } catch(e) {}
   }
-  document.getElementById('modalTitle').textContent = d.store_name + ' · 详细数据';
-  var fields = [
-    ['店铺',d.store_name],['老板',d.owner_name],['手机',d.phone],
-    ['品类',d.category],['开业',d.open_time],['员工',d.employees],
-    ['月营业额',d.monthly_revenue],['月租',d.rent],['位置',d.location],
-    ['客流',d.q1_flow_people],['客流原因',d.q2_flow_reason],['客流统计',d.q3_flow_tracking],
-    ['成交率',d.q4_conversion_rate],['流失原因',d.q5_loss_reason],['停留时长',d.q6_stay_time],
-    ['利润核算',d.q7_profit_clarity],['成本了解',d.q8_cost_awareness],['毛利率',d.q9_product_margin],
-    ['推广预算',d.q10_marketing_budget],['效果判断',d.q11_marketing_effect],['渠道',d.q12_marketing_channels],
-    ['回头率',d.q13_return_rate],['维护方式',d.q14_retention_method],['流失',d.q15_churn_reason],
-    ['在店时长',d.q16_owner_hours],['离店运转',d.q17_operation_without_owner],['SOP',d.q18_sop_status],
-    ['最大问题',d.main_problem],['期望增收',d.expected_gain],['自诊',d.self_diagnosis],['备注',d.notes]
-  ];
+  document.getElementById('modalTitle').textContent = (d.store_name || '未命名') + ' · 详细数据';
   var html = '<div class="grid">';
-  fields.forEach(function(f) { if (f[1]) { html += '<span class="k">'+f[0]+'</span><span>'+esc(f[1])+'</span>'; } });
+
+  // 判断是新版表单(v2+form_data)还是旧版(Q1-Q18)
+  if (d.form_version === 'v2' && d.form_data) {
+    var fd = d.form_data;
+    // 字段渲染函数
+    function add(k, v) {
+      if (v === undefined || v === null || v === '' || v === '未填写') return;
+      var val = Array.isArray(v) ? v.join('、') : String(v);
+      html += '<span class="k">'+esc(k)+'</span><span>'+esc(val)+'</span>';
+    }
+    add('店铺名称', fd.shopName || d.store_name);
+    add('联系方式', fd.contact);
+    add('所在区域', fd.location);
+    add('行业', (fd.industry_type||'') + (fd.industry_subtype ? ' / '+fd.industry_subtype : ''));
+    add('月营业额', fd.monthly_revenue);
+    add('月租金', fd.rent);
+    add('员工人数', fd.employees);
+    add('经营阶段', fd.stage);
+    add('近30天趋势', fd.trend_30d);
+
+    // 核心维度
+    var CORE_LIST = ['主要客源渠道','门店识别度','产品结构','成交障碍','盈亏平衡点','老板实际利润','渠道统计','推广动作','客户沉淀','复购机制','每日数据记录','老板依赖度'];
+    CORE_LIST.forEach(function(label) {
+      var v = fd.core_answers ? fd.core_answers[label] : null;
+      add(label, v);
+    });
+
+    // 行业专属
+    if (fd.special_answers) {
+      for (var k in fd.special_answers) {
+        add(k, fd.special_answers[k]);
+      }
+    }
+
+    // 需求
+    add('优先解决问题', fd.priorities);
+    add('后续需求', fd.followup_need);
+    add('期望利润提升', fd.profit_expectation);
+
+    // 风险标签
+    if (fd.tags) {
+      var tagArr = [];
+      if (fd.tags.risk && fd.tags.risk.length) {
+        fd.tags.risk.forEach(function(t) { tagArr.push('⚠️'+t); });
+      }
+      if (fd.tags.good && fd.tags.good.length) {
+        fd.tags.good.forEach(function(t) { tagArr.push('✅'+t); });
+      }
+      add('标签', tagArr.join('、'));
+    }
+
+  } else {
+    // 旧版Q1-Q18表单
+    var fields = [
+      ['店铺',d.store_name],['老板',d.owner_name],['手机',d.phone],
+      ['品类',d.category],['开业',d.open_time],['员工',d.employees],
+      ['月营业额',d.monthly_revenue],['月租',d.rent],['位置',d.location],
+      ['客流',d.q1_flow_people],['客流原因',d.q2_flow_reason],['客流统计',d.q3_flow_tracking],
+      ['成交率',d.q4_conversion_rate],['流失原因',d.q5_loss_reason],['停留时长',d.q6_stay_time],
+      ['利润核算',d.q7_profit_clarity],['成本了解',d.q8_cost_awareness],['毛利率',d.q9_product_margin],
+      ['推广预算',d.q10_marketing_budget],['效果判断',d.q11_marketing_effect],['渠道',d.q12_marketing_channels],
+      ['回头率',d.q13_return_rate],['维护方式',d.q14_retention_method],['流失',d.q15_churn_reason],
+      ['在店时长',d.q16_owner_hours],['离店运转',d.q17_operation_without_owner],['SOP',d.q18_sop_status],
+      ['最大问题',d.main_problem],['期望增收',d.expected_gain],['自诊',d.self_diagnosis],['备注',d.notes]
+    ];
+    fields.forEach(function(f) { if (f[1]) { html += '<span class="k">'+f[0]+'</span><span>'+esc(f[1])+'</span>'; } });
+  }
+
   html += '</div>';
-  html += '<div style="margin-top:12px"><span style="font-size:13px;font-weight:500">状态：</span>' +
+  html += '<div style="margin-top:16px"><span style="font-size:13px;font-weight:500">状态：</span>' +
     '<select onchange="upd(\''+d.id+'\',this.value)" style="padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px">' +
     '<option value="new"'+(d.status==='new'||!d.status?' selected':'')+'>待处理</option>' +
     '<option value="read"'+(d.status==='read'?' selected':'')+'>已读</option>' +

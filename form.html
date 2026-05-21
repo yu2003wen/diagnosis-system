@@ -174,6 +174,11 @@ h1{font-size:24px;line-height:1.3;color:var(--blue);font-weight:800}
 
 <script>
 
+// ===== Supabase 配置 =====
+var SU = 'https://quncytlifkaqcgpmjmeh.supabase.co';
+var AK = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF1bmN5dGxpZmthcWNncG1qbWVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzNjgxMTYsImV4cCI6MjA5NDk0NDExNn0.xhGD9zWq5JwQA_KNhW9bbvo3Mg5cLlCHWTKLbInjZsc';
+var HD = {'Content-Type':'application/json','apikey':AK,'Authorization':'Bearer '+AK,'Prefer':'return=minimal'};
+
 // ===== 四级位置选择：省/直辖市 → 市 → 区县 → 商圈 =====
 const LOCATION_FALLBACK = [
   {name:'北京市', children:[{name:'北京市', children:[{name:'东城区'},{name:'西城区'},{name:'朝阳区'},{name:'海淀区'},{name:'丰台区'},{name:'石景山区'},{name:'通州区'},{name:'昌平区'},{name:'大兴区'},{name:'顺义区'},{name:'房山区'},{name:'门头沟区'},{name:'怀柔区'},{name:'平谷区'},{name:'密云区'},{name:'延庆区'}]}]},
@@ -398,8 +403,42 @@ function updateProgress(){const groups=[...document.querySelectorAll('.options[d
 document.addEventListener('input',updateProgress);
 function getVal(k){let v=answers[k];return Array.isArray(v)?v.join('、'):(v||'未填写')}
 function inferTags(){let tags=[],risk=[]; if(['有流水，但利润不清楚','准备转让/止损','老店下滑，想重新调整'].includes(answers['经营阶段']))risk.push('经营阶段需重点复盘'); if(['不清楚','从没算过'].includes(answers['盈亏平衡点']))risk.push('利润底线不清'); if(['完全不知道','只能凭感觉'].includes(answers['渠道统计']))risk.push('推广效果难判断'); if(['没有沉淀','50人以下','说不清'].includes(answers['客户沉淀']))risk.push('客户资产薄弱'); if((answers['每日数据记录']||[]).includes('没有记录'))risk.push('数据记录缺失'); if(['基本完全靠老板自己','不行，会明显混乱'].includes(answers['老板依赖度']))risk.push('老板依赖度高'); if(answers['产品结构']==='很清楚，并且有对应产品')tags.push('产品结构较清晰'); if(answers['渠道统计']==='能，每个渠道都有记录')tags.push('渠道统计较好'); if(answers['客户沉淀']==='500人以上'||answers['客户沉淀']==='200–500人')tags.push('具备客户资产基础'); return {tags,risk};}
-function submitForm(){const r=inferTags();let lines=[];lines.push('【实体店经营体检摘要】');lines.push('');lines.push('一、基础信息');lines.push(`店铺名称：${document.getElementById('shopName').value.trim()||'未填写'}`);lines.push(`城市区域：${currentLocationText()||'未填写'}`);lines.push(`行业类型：${getVal('行业大类')} / ${getVal('细分类型')}`);lines.push(`月营业额：${getVal('月营业额')}`);lines.push(`月租金：${getVal('月租金')}`);lines.push(`员工人数：${getVal('员工人数')}`);lines.push('');lines.push('二、经营阶段');lines.push(`当前阶段：${getVal('经营阶段')}`);lines.push(`近30天趋势：${getVal('近30天趋势')}`);lines.push('');lines.push('三、六大维度关键答案');CORE.forEach(q=>lines.push(`${q.dim}｜${q.field}：${getVal(q.field)}`));lines.push('');lines.push('四、行业专属答案');(SPECIAL[currentIndustry]||SPECIAL['其他实体店']).forEach(x=>lines.push(`${x[0]}：${getVal(x[0])}`));lines.push('');lines.push('五、优先问题与需求');lines.push(`优先解决问题：${getVal('优先解决问题')}`);lines.push(`后续需求：${getVal('后续需求')}`);lines.push(`期望利润提升：${getVal('期望利润提升')}`);lines.push(`联系方式：${document.getElementById('contact').value.trim()||'未填写'}`);lines.push('');lines.push('六、初步风险标签');lines.push((r.risk.length?r.risk:['暂无明显高风险标签，需结合数据复核']).join('、'));
- resultContent.textContent=lines.join('\n'); tags.innerHTML=[...r.tags.map(t=>`<span class="tag good">${t}</span>`),...r.risk.map(t=>`<span class="tag risk">${t}</span>`)].join('')||'<span class="tag">待进一步分析</span>'; modal.classList.add('show');}
+function submitForm(){
+  // 生成摘要
+  const r=inferTags();let lines=[];lines.push('【实体店经营体检摘要】');lines.push('');lines.push('一、基础信息');lines.push('店铺名称：'+(document.getElementById('shopName').value.trim()||'未填写'));lines.push('城市区域：'+(currentLocationText()||'未填写'));lines.push('行业类型：'+getVal('行业大类')+' / '+getVal('细分类型'));lines.push('月营业额：'+getVal('月营业额'));lines.push('月租金：'+getVal('月租金'));lines.push('员工人数：'+getVal('员工人数'));lines.push('');lines.push('二、经营阶段');lines.push('当前阶段：'+getVal('经营阶段'));lines.push('近30天趋势：'+getVal('近30天趋势'));lines.push('');lines.push('三、六大维度关键答案');CORE.forEach(q=>lines.push(q.dim+'｜'+q.field+'：'+getVal(q.field)));lines.push('');lines.push('四、行业专属答案');(SPECIAL[currentIndustry]||SPECIAL['其他实体店']).forEach(x=>lines.push(x[0]+'：'+getVal(x[0])));lines.push('');lines.push('五、优先问题与需求');lines.push('优先解决问题：'+getVal('优先解决问题'));lines.push('后续需求：'+getVal('后续需求'));lines.push('期望利润提升：'+getVal('期望利润提升'));lines.push('联系方式：'+(document.getElementById('contact').value.trim()||'未填写'));lines.push('');lines.push('六、初步风险标签');lines.push((r.risk.length?r.risk:['暂无明显高风险标签，需结合数据复核']).join('、'));
+  resultContent.textContent=lines.join('\n'); tags.innerHTML=[...r.tags.map(t=>'<span class="tag good">'+t+'</span>'),...r.risk.map(t=>'<span class="tag risk">'+t+'</span>')].join('')||'<span class="tag">待进一步分析</span>'; modal.classList.add('show');
+
+  // 同时将所有数据提交到数据库
+  var payload = {
+    store_name: document.getElementById('shopName').value.trim() || '未填写',
+    phone: document.getElementById('contact').value.trim() || '',
+    form_version: 'v2',
+    form_data: {
+      shopName: document.getElementById('shopName').value.trim(),
+      contact: document.getElementById('contact').value.trim(),
+      location: currentLocationText(),
+      industry_type: answers['行业大类'] || '',
+      industry_subtype: answers['细分类型'] || '',
+      monthly_revenue: answers['月营业额'] || '',
+      rent: answers['月租金'] || '',
+      employees: answers['员工人数'] || '',
+      stage: answers['经营阶段'] || '',
+      trend_30d: answers['近30天趋势'] || '',
+      core_answers: {},
+      special_answers: {},
+      priorities: answers['优先解决问题'] || [],
+      followup_need: answers['后续需求'] || '',
+      profit_expectation: answers['期望利润提升'] || '',
+      tags: {good: r.tags, risk: r.risk}
+    }
+  };
+  CORE.forEach(function(q) { payload.form_data.core_answers[q.field] = answers[q.field] || ''; });
+  (SPECIAL[currentIndustry]||SPECIAL['其他实体店']).forEach(function(x) { payload.form_data.special_answers[x[0]] = answers[x[0]] || ''; });
+
+  fetch(SU + '/rest/v1/submissions', {method:'POST', headers: HD, body: JSON.stringify([payload])}).catch(function(err) {
+    console.error('提交数据失败:', err);
+  });
+}
 function copyResult(){navigator.clipboard.writeText(resultContent.textContent).then(()=>alert('已复制，可发送给顾问'));}
 function closeModal(){modal.classList.remove('show')}
 renderIndustries();renderCore();bindAllOptions();loadLocationData();updateProgress();
