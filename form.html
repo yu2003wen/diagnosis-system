@@ -415,9 +415,9 @@ function submitForm(){
   var contact = document.getElementById('contact').value.trim();
 
   var payload = {
-    store_name: shopName || '未填写',
-    owner_name: '',
-    phone: contact || '',
+    store_name: shopName || '未命名店铺',
+    owner_name: shopName || '未填写',
+    phone: contact || '未填写',
     category: answers['行业大类'] || '',
     form_version: 'v2',
     form_data: {
