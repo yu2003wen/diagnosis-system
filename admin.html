@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>管理后台</title>
 <style>
-*{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif}
-body{background:#f0f2f5;color:#333;min-height:100vh}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;background:#f0f2f5;color:#333}
 .login-page{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
 .login-card{background:#fff;border-radius:12px;padding:40px 32px;width:100%;max-width:380px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
 .login-card h1{font-size:22px;color:#1F4E79;text-align:center;margin-bottom:24px}
@@ -21,18 +21,31 @@ body{background:#f0f2f5;color:#333;min-height:100vh}
 .btn-logout{padding:6px 14px;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:6px;cursor:pointer;font-size:12px}
 .content{padding:20px 24px}
 table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;font-size:13px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
-th{background:#f8f9fb;padding:12px 10px;text-align:left;border-bottom:1px solid #eee}
+th{background:#f8f9fb;padding:12px 10px;text-align:left;border-bottom:1px solid #eee;font-weight:600;color:#555}
 td{padding:10px;border-bottom:1px solid #f0f0f0}
 tr:hover td{background:#f8faff}
-.status-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
-.s-new{background:#fff3e0;color:#e65100}
-.s-read{background:#e3f2fd;color:#1565c0}
-.s-progress{background:#f3e5f5;color:#7b1fa2}
-.s-done{background:#e8f5e9;color:#2e7d32}
-.btn-small{padding:4px 10px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:12px}
-.btn-small:hover{background:#f5f5f5}
+.b{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+.b-n{background:#fff3e0;color:#e65100}
+.b-r{background:#e3f2fd;color:#1565c0}
+.b-p{background:#f3e5f5;color:#7b1fa2}
+.b-d{background:#e8f5e9;color:#2e7d32}
+.sbtn{padding:4px 10px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:12px}
+.sbtn:hover{background:#f5f5f5}
+.sbtn-p{background:#1F4E79;color:#fff;border-color:#1F4E79}
+.sbtn-p:hover{background:#2a6ba8}
 .empty{text-align:center;padding:60px 20px;color:#999}
 .loading{text-align:center;padding:60px;color:#888}
+.stat{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.sc{background:#fff;border-radius:8px;padding:12px 20px;text-align:center;flex:1;min-width:80px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.sc .n{font-size:24px;font-weight:700;color:#1F4E79}
+.sc .l{font-size:12px;color:#888}
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;padding:40px 20px;overflow-y:auto}
+.modal.show{display:block}
+.mc{background:#fff;border-radius:12px;max-width:600px;margin:0 auto;padding:24px;position:relative}
+.mc h2{font-size:18px;color:#1F4E79;margin-bottom:16px}
+.mc-close{position:absolute;top:12px;right:16px;font-size:28px;cursor:pointer;color:#999;background:none;border:none;line-height:1}
+.grid{display:grid;grid-template-columns:100px 1fr;gap:4px 12px;font-size:13px;margin-bottom:16px}
+.grid .k{color:#888}
 </style>
 </head>
 <body>
@@ -41,207 +54,184 @@ tr:hover td{background:#f8faff}
   <div class="login-card">
     <h1>管理后台</h1>
     <form id="loginForm">
-      <input type="password" id="loginPassword" placeholder="管理员密码" required>
-      <button type="submit" id="loginBtn">进入后台</button>
-      <div class="login-error" id="loginError">密码错误</div>
+      <input type="password" id="pw" placeholder="管理员密码" required>
+      <button type="submit">进入后台</button>
+      <div class="login-error" id="loginErr">密码错误</div>
     </form>
   </div>
 </div>
 
-<div class="app-layout" id="appLayout">
+<div class="app-layout" id="app">
   <div class="header">
     <h1>客户自诊数据</h1>
-    <button class="btn-logout" id="btnLogout">退出</button>
+    <button class="btn-logout" id="logoutBtn">退出</button>
   </div>
   <div class="content">
-    <div id="stats" style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap"></div>
+    <div class="stat" id="statBar"></div>
     <div style="margin-bottom:12px">
-      <select id="filterStatus" style="padding:6px 10px;border:1px solid #ddd;border-radius:4px;font-size:13px">
-        <option value="all">全部</option>
-        <option value="new">待处理</option>
-        <option value="read">已读</option>
-        <option value="processing">处理中</option>
+      <select id="filter" style="padding:6px 10px;border:1px solid #ddd;border-radius:4px;font-size:13px">
+        <option value="all">全部</option><option value="new">待处理</option>
+        <option value="read">已读</option><option value="processing">处理中</option>
         <option value="completed">已完成</option>
       </select>
-      <button style="padding:6px 12px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;margin-left:8px" id="btnRefresh">刷新</button>
+      <button class="sbtn" id="refreshBtn" style="margin-left:8px">刷新</button>
     </div>
-    <div class="loading" id="loadingState">加载中...</div>
-    <div class="empty" id="emptyState" style="display:none"><h3>暂无数据</h3></div>
-    <table id="dataTable" style="display:none">
+    <div class="loading" id="loading">加载中...</div>
+    <div class="empty" id="empty" style="display:none"><h3>暂无数据</h3></div>
+    <table id="table" style="display:none">
       <thead><tr><th>时间</th><th>店铺</th><th>客户</th><th>手机</th><th>状态</th><th>操作</th></tr></thead>
-      <tbody id="tableBody"></tbody>
+      <tbody id="tbody"></tbody>
     </table>
   </div>
 </div>
 
-<script>
-// ===== 密码验证（不依赖任何外部加载） =====
-const ADMIN_PASSWORD = 'admin888';
+<div class="modal" id="modal">
+  <div class="mc">
+    <button class="mc-close" id="modalClose">&times;</button>
+    <h2 id="modalTitle">详情</h2>
+    <div id="modalBody"></div>
+  </div>
+</div>
 
+<script>
+// ===== 配置 =====
+var SU = 'https://quncytlifkaqcgpmjmeh.supabase.co';
+var AK = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF1bmN5dGxpZmthcWNncG1qbWVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzNjgxMTYsImV4cCI6MjA5NDk0NDExNn0.xhGD9zWq5JwQA_KNhW9bbvo3Mg5cLlCHWTKLbInjZsc';
+var PW = 'admin888';
+var all = [];
+var headers = {'apikey': AK, 'Authorization': 'Bearer ' + AK};
+
+// ===== 登录 =====
 document.getElementById('loginForm').onsubmit = function(e) {
   e.preventDefault();
-  if (document.getElementById('loginPassword').value === ADMIN_PASSWORD) {
+  document.getElementById('loginErr').style.display = 'none';
+  if (document.getElementById('pw').value === PW) {
+    sessionStorage.setItem('ok','1');
     document.getElementById('loginPage').style.display = 'none';
-    document.getElementById('appLayout').style.display = 'block';
-    sessionStorage.setItem('logged', '1');
-    // 现在再加载 Supabase
-    loadSupabaseScript();
+    document.getElementById('app').style.display = 'block';
+    load();
   } else {
-    document.getElementById('loginError').style.display = 'block';
+    document.getElementById('loginErr').style.display = 'block';
   }
 };
 
-document.getElementById('btnLogout').onclick = function() {
-  sessionStorage.removeItem('logged');
+document.getElementById('logoutBtn').onclick = function() {
+  sessionStorage.removeItem('ok');
   document.getElementById('loginPage').style.display = 'flex';
-  document.getElementById('appLayout').style.display = 'none';
+  document.getElementById('app').style.display = 'none';
 };
 
-// 恢复登录状态
-if (sessionStorage.getItem('logged') === '1') {
+if (sessionStorage.getItem('ok') === '1') {
   document.getElementById('loginPage').style.display = 'none';
-  document.getElementById('appLayout').style.display = 'block';
-  loadSupabaseScript();
+  document.getElementById('app').style.display = 'block';
+  load();
 }
 
-// ===== 动态加载 Supabase SDK =====
-function loadSupabaseScript() {
-  var script = document.createElement('script');
-  script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
-  script.onload = function() {
-    startApp();
-  };
-  script.onerror = function() {
-    document.getElementById('loadingState').textContent = '⚠️ 网络加载失败，请检查网络连接后刷新页面';
-  };
-  document.head.appendChild(script);
-}
+document.getElementById('filter').onchange = render;
+document.getElementById('refreshBtn').onclick = load;
+document.getElementById('modalClose').onclick = function() { document.getElementById('modal').classList.remove('show'); };
+document.getElementById('modal').onclick = function(e) { if (e.target === this) this.classList.remove('show'); };
 
-// ===== 启动应用 =====
-var supabase;
-var allData = [];
-
-function startApp() {
-  supabase = window.supabase.createClient(
-    'https://quncytlifkaqcgpmjmeh.supabase.co',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF1bmN5dGxpZmthcWNncG1qbWVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzNjgxMTYsImV4cCI6MjA5NDk0NDExNn0.xhGD9zWq5JwQA_KNhW9bbvo3Mg5cLlCHWTKLbInjZsc'
-  );
-  document.getElementById('filterStatus').onchange = render;
-  document.getElementById('btnRefresh').onclick = loadData;
-  loadData();
-}
-
-async function loadData() {
-  document.getElementById('loadingState').style.display = 'block';
-  document.getElementById('dataTable').style.display = 'none';
-  document.getElementById('emptyState').style.display = 'none';
+// ===== 加载数据 =====
+async function load() {
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('table').style.display = 'none';
+  document.getElementById('empty').style.display = 'none';
   try {
-    var res = await supabase.from('submissions').select('*').order('created_at', { ascending: false });
-    if (res.error) throw res.error;
-    allData = res.data || [];
+    var r = await fetch(SU + '/rest/v1/submissions?select=*&order=created_at.desc', {headers: headers});
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    all = await r.json() || [];
     render();
   } catch(e) {
-    document.getElementById('loadingState').textContent = '⚠️ 数据加载失败：' + e.message;
+    document.getElementById('loading').textContent = '⚠️ 加载失败：' + e.message;
   }
-  document.getElementById('loadingState').style.display = 'none';
+  document.getElementById('loading').style.display = 'none';
 }
 
+// ===== 渲染 =====
 function render() {
-  var f = document.getElementById('filterStatus').value;
-  var list = f === 'all' ? allData : allData.filter(function(d) { return d.status === f; });
-  var total = allData.length;
-  var n = allData.filter(function(d) { return !d.status || d.status === 'new'; }).length;
-  var p = allData.filter(function(d) { return d.status === 'processing'; }).length;
-  var c = allData.filter(function(d) { return d.status === 'completed'; }).length;
-  document.getElementById('stats').innerHTML =
-    '<div style="background:#fff;border-radius:8px;padding:12px 20px;text-align:center;flex:1;min-width:80px"><div style="font-size:24px;font-weight:700;color:#1F4E79">'+total+'</div><div style="font-size:12px;color:#888">全部</div></div>' +
-    '<div style="background:#fff;border-radius:8px;padding:12px 20px;text-align:center;flex:1;min-width:80px"><div style="font-size:24px;font-weight:700;color:#e65100">'+n+'</div><div style="font-size:12px;color:#888">待处理</div></div>' +
-    '<div style="background:#fff;border-radius:8px;padding:12px 20px;text-align:center;flex:1;min-width:80px"><div style="font-size:24px;font-weight:700;color:#7b1fa2">'+p+'</div><div style="font-size:12px;color:#888">处理中</div></div>' +
-    '<div style="background:#fff;border-radius:8px;padding:12px 20px;text-align:center;flex:1;min-width:80px"><div style="font-size:24px;font-weight:700;color:#2e7d32">'+c+'</div><div style="font-size:12px;color:#888">已完成</div></div>';
+  var f = document.getElementById('filter').value;
+  var list = f === 'all' ? all : all.filter(function(d) { return d.status === f; });
+  var n = all.filter(function(d) { return !d.status || d.status === 'new'; }).length;
+  var p = all.filter(function(d) { return d.status === 'processing'; }).length;
+  var c = all.filter(function(d) { return d.status === 'completed'; }).length;
+  document.getElementById('statBar').innerHTML =
+    '<div class="sc"><div class="n">'+all.length+'</div><div class="l">全部</div></div>' +
+    '<div class="sc"><div class="n" style="color:#e65100">'+n+'</div><div class="l">待处理</div></div>' +
+    '<div class="sc"><div class="n" style="color:#7b1fa2">'+p+'</div><div class="l">处理中</div></div>' +
+    '<div class="sc"><div class="n" style="color:#2e7d32">'+c+'</div><div class="l">已完成</div></div>';
   if (list.length === 0) {
-    document.getElementById('dataTable').style.display = 'none';
-    document.getElementById('emptyState').style.display = 'block';
+    document.getElementById('table').style.display = 'none';
+    document.getElementById('empty').style.display = 'block';
     return;
   }
-  document.getElementById('dataTable').style.display = 'table';
-  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('table').style.display = 'table';
+  document.getElementById('empty').style.display = 'none';
   var html = '';
   list.forEach(function(d) {
-    var sc = (!d.status || d.status === 'new') ? 's-new' : d.status === 'read' ? 's-read' : d.status === 'processing' ? 's-progress' : 's-done';
-    var sl = (!d.status || d.status === 'new') ? '待处理' : d.status === 'read' ? '已读' : d.status === 'processing' ? '处理中' : '已完成';
-    var t = d.created_at ? new Date(d.created_at).toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '-';
-    html += '<tr><td>'+esc(t)+'</td><td><b>'+esc(d.store_name)+'</b></td><td>'+esc(d.owner_name)+'</td><td>'+esc(d.phone)+'</td><td><span class="status-badge '+sc+'">'+sl+'</span></td><td><button class="btn-small" onclick="viewDetail(\''+d.id+'\')">详情</button></td></tr>';
+    var sc = (!d.status||d.status==='new')?'b-n':d.status==='read'?'b-r':d.status==='processing'?'b-p':'b-d';
+    var sl = (!d.status||d.status==='new')?'待处理':d.status==='read'?'已读':d.status==='processing'?'处理中':'已完成';
+    var t = d.created_at ? new Date(d.created_at).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '-';
+    html += '<tr><td style="white-space:nowrap">'+esc(t)+'</td><td><b>'+esc(d.store_name)+'</b></td><td>'+esc(d.owner_name)+'</td><td>'+esc(d.phone)+'</td><td><span class="b '+sc+'">'+sl+'</span></td><td><button class="sbtn sbtn-p" onclick="view(\''+d.id+'\')">详情</button></td></tr>';
   });
-  document.getElementById('tableBody').innerHTML = html;
+  document.getElementById('tbody').innerHTML = html;
 }
 
 function esc(s) { if (!s) return ''; var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-async function viewDetail(id) {
-  var d = allData.find(function(x) { return x.id === id; });
+// ===== 查看详情 =====
+async function view(id) {
+  var d = all.find(function(x) { return x.id === id; });
   if (!d) return;
   if (!d.status || d.status === 'new') {
-    await supabase.from('submissions').update({status:'read'}).eq('id', id);
-    d.status = 'read';
-    render();
+    try {
+      await fetch(SU + '/rest/v1/submissions?id=eq.' + id, {
+        method: 'PATCH', headers: Object.assign({'Content-Type':'application/json'}, headers),
+        body: JSON.stringify({status:'read'})
+      });
+      d.status = 'read';
+      render();
+    } catch(e) {}
   }
+  document.getElementById('modalTitle').textContent = d.store_name + ' · 详细数据';
   var fields = [
-    ['店铺', d.store_name], ['老板', d.owner_name], ['手机', d.phone],
-    ['品类', d.category], ['开业', d.open_time], ['员工', d.employees],
-    ['月营业额', d.monthly_revenue], ['月租', d.rent], ['位置', d.location],
-    ['客流', d.q1_flow_people], ['客流原因', d.q2_flow_reason], ['客流统计', d.q3_flow_tracking],
-    ['成交率', d.q4_conversion_rate], ['流失原因', d.q5_loss_reason], ['停留时长', d.q6_stay_time],
-    ['利润核算', d.q7_profit_clarity], ['成本了解', d.q8_cost_awareness], ['毛利率', d.q9_product_margin],
-    ['推广预算', d.q10_marketing_budget], ['效果判断', d.q11_marketing_effect], ['渠道', d.q12_marketing_channels],
-    ['回头率', d.q13_return_rate], ['维护方式', d.q14_retention_method], ['流失', d.q15_churn_reason],
-    ['在店时长', d.q16_owner_hours], ['离店运转', d.q17_operation_without_owner], ['SOP', d.q18_sop_status],
-    ['最大问题', d.main_problem], ['期望增收', d.expected_gain], ['自诊', d.self_diagnosis],
-    ['备注', d.notes]
+    ['店铺',d.store_name],['老板',d.owner_name],['手机',d.phone],
+    ['品类',d.category],['开业',d.open_time],['员工',d.employees],
+    ['月营业额',d.monthly_revenue],['月租',d.rent],['位置',d.location],
+    ['客流',d.q1_flow_people],['客流原因',d.q2_flow_reason],['客流统计',d.q3_flow_tracking],
+    ['成交率',d.q4_conversion_rate],['流失原因',d.q5_loss_reason],['停留时长',d.q6_stay_time],
+    ['利润核算',d.q7_profit_clarity],['成本了解',d.q8_cost_awareness],['毛利率',d.q9_product_margin],
+    ['推广预算',d.q10_marketing_budget],['效果判断',d.q11_marketing_effect],['渠道',d.q12_marketing_channels],
+    ['回头率',d.q13_return_rate],['维护方式',d.q14_retention_method],['流失',d.q15_churn_reason],
+    ['在店时长',d.q16_owner_hours],['离店运转',d.q17_operation_without_owner],['SOP',d.q18_sop_status],
+    ['最大问题',d.main_problem],['期望增收',d.expected_gain],['自诊',d.self_diagnosis],['备注',d.notes]
   ];
-  var html = '<div style="display:grid;grid-template-columns:100px 1fr;gap:6px 12px;font-size:13px">';
-  fields.forEach(function(f) {
-    if (f[1]) { html += '<span style="color:#888">'+esc(f[0])+'</span><span>'+esc(f[1])+'</span>'; }
-  });
+  var html = '<div class="grid">';
+  fields.forEach(function(f) { if (f[1]) { html += '<span class="k">'+f[0]+'</span><span>'+esc(f[1])+'</span>'; } });
   html += '</div>';
-  html += '<div style="margin-top:16px"><span style="font-size:13px;font-weight:500">状态：</span>' +
-    '<select onchange="updateStatus(\''+d.id+'\',this.value)" style="padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px">' +
+  html += '<div style="margin-top:12px"><span style="font-size:13px;font-weight:500">状态：</span>' +
+    '<select onchange="upd(\''+d.id+'\',this.value)" style="padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px">' +
     '<option value="new"'+(d.status==='new'||!d.status?' selected':'')+'>待处理</option>' +
     '<option value="read"'+(d.status==='read'?' selected':'')+'>已读</option>' +
     '<option value="processing"'+(d.status==='processing'?' selected':'')+'>处理中</option>' +
     '<option value="completed"'+(d.status==='completed'?' selected':'')+'>已完成</option>' +
     '</select></div>';
   document.getElementById('modalBody').innerHTML = html;
-  document.getElementById('modalOverlay').classList.add('show');
+  document.getElementById('modal').classList.add('show');
 }
 
-async function updateStatus(id, status) {
+async function upd(id, status) {
   try {
-    await supabase.from('submissions').update({status:status}).eq('id', id);
-    var d = allData.find(function(x) { return x.id === id; });
+    await fetch(SU + '/rest/v1/submissions?id=eq.' + id, {
+      method: 'PATCH',
+      headers: Object.assign({'Content-Type':'application/json'}, headers),
+      body: JSON.stringify({status: status})
+    });
+    var d = all.find(function(x) { return x.id === id; });
     if (d) d.status = status;
     render();
-  } catch(e) {
-    alert('更新失败：'+e.message);
-  }
+  } catch(e) { alert('更新失败'); }
 }
-
-// 弹窗控制
-document.getElementById('modalClose').onclick = function() {
-  document.getElementById('modalOverlay').classList.remove('show');
-};
-document.getElementById('modalOverlay').onclick = function(e) {
-  if (e.target === this) this.classList.remove('show');
-};
 </script>
-
-<!-- 弹窗 -->
-<div class="modal" id="modalOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;padding:40px 20px;overflow-y:auto">
-  <div style="background:#fff;border-radius:12px;max-width:600px;margin:0 auto;padding:24px;position:relative">
-    <button id="modalClose" style="position:absolute;top:12px;right:16px;font-size:24px;cursor:pointer;color:#999;background:none;border:none">&times;</button>
-    <h2 id="modalTitle" style="font-size:18px;color:#1F4E79;margin-bottom:16px">详情</h2>
-    <div id="modalBody"></div>
-  </div>
-</div>
-
 </body>
 </html>

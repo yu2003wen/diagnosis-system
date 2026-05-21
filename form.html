@@ -1,835 +1,343 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>实体店经营自诊表</title>
-  <!-- Supabase SDK 将在提交时动态加载 -->
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
-      background: #f5f7fa;
-      color: #333;
-      padding: 0;
-      min-height: 100vh;
-    }
-
-    /* ===== Header ===== */
-    .header {
-      background: linear-gradient(135deg, #1F4E79 0%, #2a6ba8 100%);
-      color: white;
-      padding: 40px 20px 30px;
-      text-align: center;
-    }
-    .header h1 { font-size: 22px; margin-bottom: 8px; letter-spacing: 1px; }
-    .header p { font-size: 13px; opacity: 0.85; line-height: 1.6; }
-
-    /* ===== 进度条 ===== */
-    .progress-bar {
-      display: flex;
-      justify-content: center;
-      gap: 6px;
-      padding: 16px 20px;
-      background: white;
-      border-bottom: 1px solid #eee;
-    }
-    .progress-dot {
-      width: 10px; height: 10px;
-      border-radius: 50%;
-      background: #e0e0e0;
-      transition: all 0.3s;
-    }
-    .progress-dot.active { background: #1F4E79; transform: scale(1.2); }
-    .progress-dot.done { background: #4CAF50; }
-
-    /* ===== 表单容器 ===== */
-    .container { max-width: 640px; margin: 0 auto; padding: 16px; }
-
-    /* ===== 分组卡片 ===== */
-    .section-card {
-      background: white;
-      border-radius: 12px;
-      padding: 24px 20px;
-      margin-bottom: 16px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-    }
-    .section-title {
-      font-size: 17px;
-      font-weight: 600;
-      color: #1F4E79;
-      margin-bottom: 4px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .section-subtitle {
-      font-size: 13px;
-      color: #888;
-      margin-bottom: 18px;
-      line-height: 1.5;
-    }
-    .section-badge {
-      display: inline-block;
-      background: #e8f0fe;
-      color: #1F4E79;
-      font-size: 11px;
-      font-weight: 600;
-      padding: 2px 8px;
-      border-radius: 4px;
-      margin-left: 4px;
-    }
-
-    /* ===== 问题 ===== */
-    .question {
-      margin-bottom: 20px;
-    }
-    .question:last-child { margin-bottom: 0; }
-    .question-label {
-      font-size: 14px;
-      font-weight: 500;
-      margin-bottom: 10px;
-      line-height: 1.5;
-    }
-    .question-label .required {
-      color: #e53935;
-      margin-left: 2px;
-    }
-    .question-hint {
-      font-size: 12px;
-      color: #999;
-      margin-bottom: 8px;
-    }
-
-    /* ===== 选项 ===== */
-    .options { display: flex; flex-direction: column; gap: 8px; }
-    .option-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      padding: 12px 14px;
-      border: 1.5px solid #e8e8e8;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: all 0.2s;
-      font-size: 14px;
-      line-height: 1.4;
-    }
-    .option-item:hover { border-color: #b0c4de; background: #f8faff; }
-    .option-item.selected {
-      border-color: #1F4E79;
-      background: #eef4fb;
-    }
-    .option-item input[type="radio"],
-    .option-item input[type="checkbox"] {
-      margin-top: 2px;
-      accent-color: #1F4E79;
-      flex-shrink: 0;
-    }
-    .option-item .option-text { flex: 1; }
-
-    /* ===== 输入框 ===== */
-    input[type="text"],
-    input[type="tel"],
-    textarea {
-      width: 100%;
-      padding: 12px 14px;
-      border: 1.5px solid #ddd;
-      border-radius: 8px;
-      font-size: 14px;
-      font-family: inherit;
-      transition: border-color 0.2s;
-    }
-    input:focus, textarea:focus {
-      outline: none;
-      border-color: #1F4E79;
-      box-shadow: 0 0 0 3px rgba(31,78,121,0.1);
-    }
-    textarea { resize: vertical; min-height: 80px; }
-
-    /* ===== 基本信息网格 ===== */
-    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .info-grid .full-width { grid-column: 1 / -1; }
-    .field-group { margin-bottom: 14px; }
-    .field-group label {
-      display: block;
-      font-size: 13px;
-      font-weight: 500;
-      margin-bottom: 5px;
-      color: #555;
-    }
-    .field-group label .required { color: #e53935; }
-    .field-group select {
-      width: 100%;
-      padding: 12px 14px;
-      border: 1.5px solid #ddd;
-      border-radius: 8px;
-      font-size: 14px;
-      font-family: inherit;
-      background: white;
-      appearance: auto;
-    }
-
-    /* ===== 提交按钮 ===== */
-    .submit-area {
-      padding: 20px 0 40px;
-      text-align: center;
-    }
-    .btn-submit {
-      width: 100%;
-      max-width: 400px;
-      padding: 16px;
-      background: linear-gradient(135deg, #1F4E79, #2a6ba8);
-      color: white;
-      border: none;
-      border-radius: 10px;
-      font-size: 17px;
-      font-weight: 600;
-      letter-spacing: 2px;
-      cursor: pointer;
-      transition: all 0.3s;
-    }
-    .btn-submit:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(31,78,121,0.3); }
-    .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-
-    /* ===== 提交成功 ===== */
-    .success-page {
-      display: none;
-      text-align: center;
-      padding: 60px 20px;
-    }
-    .success-page .icon {
-      font-size: 64px;
-      margin-bottom: 16px;
-    }
-    .success-page h2 {
-      font-size: 22px;
-      color: #1F4E79;
-      margin-bottom: 12px;
-    }
-    .success-page p {
-      font-size: 14px;
-      color: #666;
-      line-height: 1.8;
-    }
-
-    /* ===== Toast 提示 ===== */
-    .toast {
-      position: fixed;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #333;
-      color: white;
-      padding: 12px 24px;
-      border-radius: 8px;
-      font-size: 14px;
-      z-index: 1000;
-      opacity: 0;
-      transition: opacity 0.3s;
-      pointer-events: none;
-    }
-    .toast.show { opacity: 1; }
-
-    /* ===== 加载状态 ===== */
-    .loading {
-      display: inline-block;
-      width: 20px;
-      height: 20px;
-      border: 2px solid rgba(255,255,255,0.3);
-      border-top-color: white;
-      border-radius: 50%;
-      animation: spin 0.6s linear infinite;
-      vertical-align: middle;
-      margin-right: 8px;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    @media (max-width: 480px) {
-      .header { padding: 30px 16px 24px; }
-      .header h1 { font-size: 19px; }
-      .section-card { padding: 18px 16px; }
-      .info-grid { grid-template-columns: 1fr; }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>实体店经营自诊表</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;background:#f5f7fa;color:#333}
+.header{background:linear-gradient(135deg,#1F4E79,#2a6ba8);color:#fff;padding:36px 20px 24px;text-align:center}
+.header h1{font-size:21px;margin-bottom:6px}
+.header p{font-size:13px;opacity:.85;line-height:1.6}
+.container{max-width:640px;margin:0 auto;padding:12px}
+.card{background:#fff;border-radius:12px;padding:20px 18px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.card-title{font-size:16px;font-weight:600;color:#1F4E79;margin-bottom:2px}
+.card-sub{font-size:12px;color:#888;margin-bottom:14px}
+.q{margin-bottom:16px}
+.q:last-child{margin-bottom:0}
+.q-label{font-size:14px;font-weight:500;margin-bottom:8px;line-height:1.5}
+.q-label .r{color:#e53935}
+.opt{display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border:1.5px solid #e8e8e8;border-radius:8px;cursor:pointer;transition:.2s;font-size:13px;margin-bottom:6px}
+.opt:hover{border-color:#b0c4de;background:#f8faff}
+.opt.sel{border-color:#1F4E79;background:#eef4fb}
+.opt input[type=radio],.opt input[type=checkbox]{margin-top:2px;accent-color:#1F4E79;flex-shrink:0}
+.opt .txt{flex:1}
+input[type=text],input[type=tel],select,textarea{width:100%;padding:10px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;margin-bottom:2px}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#1F4E79;box-shadow:0 0 0 3px rgba(31,78,121,.1)}
+textarea{resize:vertical;min-height:60px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fg{margin-bottom:10px}
+.fg label{display:block;font-size:12px;font-weight:500;margin-bottom:4px;color:#555}
+.submit-area{padding:16px 0 32px;text-align:center}
+.btn{width:100%;max-width:400px;padding:14px;background:linear-gradient(135deg,#1F4E79,#2a6ba8);color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;letter-spacing:2px}
+.btn:hover{box-shadow:0 4px 15px rgba(31,78,121,.3)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.msg{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:999;opacity:0;transition:.3s;pointer-events:none}
+.msg.show{opacity:1}
+.s-page{display:none;text-align:center;padding:60px 20px}
+.s-page .icon{font-size:56px;margin-bottom:12px}
+.s-page h2{font-size:20px;color:#1F4E79;margin-bottom:10px}
+.s-page p{font-size:13px;color:#666;line-height:1.8}
+@media(max-width:480px){.grid2{grid-template-columns:1fr}}
+</style>
 </head>
 <body>
 
-  <!-- Toast 提示 -->
-  <div class="toast" id="toast"></div>
+<div class="header">
+<h1>实体店经营自诊表</h1>
+<p>填写约需5-8分钟 · 数据仅用于经营诊断<br>提交后顾问将在1-2个工作日内出具报告</p>
+</div>
 
-  <!-- Header -->
-  <div class="header">
-    <h1>实体店经营自诊表</h1>
-    <p>填写约需 5-8 分钟 · 数据仅用于经营诊断<br>提交后顾问将在 1-2 个工作日内出具报告</p>
-  </div>
+<div class="container" id="formArea">
+<form id="f" novalidate>
 
-  <!-- 进度条 -->
-  <div class="progress-bar" id="progressBar"></div>
+<!-- 基本信息 -->
+<div class="card">
+<div class="card-title">📋 基本信息</div>
+<div class="card-sub">方便我们了解你的店铺基本情况</div>
+<div class="grid2">
+<div class="fg"><label>店铺名称 <span class="r">*</span></label><input type="text" name="store_name" required placeholder="如：老王面馆"></div>
+<div class="fg"><label>您的姓名 <span class="r">*</span></label><input type="text" name="owner_name" required placeholder="如：王老板"></div>
+<div class="fg"><label>手机号 <span class="r">*</span></label><input type="tel" name="phone" required placeholder="用于接收报告"></div>
+<div class="fg"><label>品类 <span class="r">*</span></label>
+<select name="category" required><option value="">请选择</option><option>餐饮</option><option>零售</option><option>美业</option><option>生活服务</option><option>其他</option></select></div>
+<div class="fg"><label>开业时长</label>
+<select name="open_time"><option value="">请选择</option><option>不到半年</option><option>6个月-1年</option><option>1-3年</option><option>3年以上</option></select></div>
+<div class="fg"><label>员工人数</label>
+<select name="employees"><option value="">请选择</option><option>1人（自己干）</option><option>2-3人</option><option>4-6人</option><option>7人以上</option></select></div>
+<div class="fg"><label>月均营业额</label>
+<select name="monthly_revenue"><option value="">请选择</option><option>1万以下</option><option>1-3万</option><option>3-5万</option><option>5-10万</option><option>10万以上</option></select></div>
+<div class="fg"><label>月租金</label>
+<select name="rent"><option value="">请选择</option><option>3000元以下</option><option>3000-5000元</option><option>5000-10000元</option><option>10000元以上</option></select></div>
+<div class="fg"><label>店铺位置</label>
+<select name="location"><option value="">请选择</option><option>商业街/步行街</option><option>社区底商</option><option>商场/购物中心</option><option>写字楼/办公区</option><option>学校周边</option></select></div>
+<div class="fg"><label>经营面积（㎡）</label><input type="text" name="area" placeholder="如：50"></div>
+</div>
+</div>
 
-  <!-- ===== 表单区域 ===== -->
-  <div class="container" id="formArea">
-    <form id="diagnosisForm" novalidate>
+<!-- 维度1：客流 -->
+<div class="card">
+<div class="card-title">🚶 客流分析</div>
+<div class="card-sub">了解你店里的客流量情况</div>
+<div class="q"><div class="q-label">Q1. 每天大概有多少人进店？ <span class="r">*</span></div>
+<div class="opt" data-n="q1"><input type="radio" name="q1" value="不到30人"><span class="txt">不到30人</span></div>
+<div class="opt" data-n="q1"><input type="radio" name="q1" value="30-60人"><span class="txt">30-60人</span></div>
+<div class="opt" data-n="q1"><input type="radio" name="q1" value="60-100人"><span class="txt">60-100人</span></div>
+<div class="opt" data-n="q1"><input type="radio" name="q1" value="100人以上"><span class="txt">100人以上</span></div></div>
+<div class="q"><div class="q-label">Q2. 你认为客流不足的主要原因是？ <span class="r">*</span></div>
+<div class="opt" data-n="q2"><input type="radio" name="q2" value="周边竞品太多"><span class="txt">周边竞品太多，分流严重</span></div>
+<div class="opt" data-n="q2"><input type="radio" name="q2" value="位置太偏"><span class="txt">店铺位置比较偏</span></div>
+<div class="opt" data-n="q2"><input type="radio" name="q2" value="宣传不够"><span class="txt">宣传推广不够</span></div>
+<div class="opt" data-n="q2"><input type="radio" name="q2" value="说不清楚"><span class="txt">说不清楚具体原因</span></div></div>
+<div class="q"><div class="q-label">Q3. 你是否有统计门前客流？ <span class="r">*</span></div>
+<div class="opt" data-n="q3"><input type="radio" name="q3" value="完全没有统计"><span class="txt">完全没有统计</span></div>
+<div class="opt" data-n="q3"><input type="radio" name="q3" value="凭感觉大概知道"><span class="txt">凭感觉大概知道</span></div>
+<div class="opt" data-n="q3"><input type="radio" name="q3" value="偶尔数一下"><span class="txt">偶尔会数一下</span></div>
+<div class="opt" data-n="q3"><input type="radio" name="q3" value="有系统化统计"><span class="txt">有系统化统计</span></div></div>
+</div>
 
-      <!-- ======== 基本信息 ======== -->
-      <div class="section-card">
-        <div class="section-title">📋 基本信息</div>
-        <div class="section-subtitle">方便我们了解你的店铺基本情况</div>
-        <div class="info-grid">
-          <div class="field-group">
-            <label>店铺名称 <span class="required">*</span></label>
-            <input type="text" name="store_name" required placeholder="如：老王面馆">
-          </div>
-          <div class="field-group">
-            <label>您的姓名 <span class="required">*</span></label>
-            <input type="text" name="owner_name" required placeholder="如：王老板">
-          </div>
-          <div class="field-group">
-            <label>手机号 <span class="required">*</span></label>
-            <input type="tel" name="phone" required placeholder="用于接收报告">
-          </div>
-          <div class="field-group">
-            <label>品类 <span class="required">*</span></label>
-            <select name="category" required>
-              <option value="">请选择</option>
-              <option value="餐饮">餐饮</option>
-              <option value="零售">零售</option>
-              <option value="美业">美业（美容/美发/美甲）</option>
-              <option value="服务">生活服务</option>
-              <option value="其他">其他</option>
-            </select>
-          </div>
-          <div class="field-group">
-            <label>开业时长</label>
-            <select name="open_time">
-              <option value="">请选择</option>
-              <option value="不到半年">不到半年</option>
-              <option value="6个月-1年">6个月-1年</option>
-              <option value="1-3年">1-3年</option>
-              <option value="3年以上">3年以上</option>
-            </select>
-          </div>
-          <div class="field-group">
-            <label>员工人数</label>
-            <select name="employees">
-              <option value="">请选择</option>
-              <option value="1人（自己干）">1人（自己干）</option>
-              <option value="2-3人">2-3人</option>
-              <option value="4-6人">4-6人</option>
-              <option value="7人以上">7人以上</option>
-            </select>
-          </div>
-          <div class="field-group">
-            <label>月均营业额</label>
-            <select name="monthly_revenue">
-              <option value="">请选择</option>
-              <option value="1万以下">1万以下</option>
-              <option value="1-3万">1-3万</option>
-              <option value="3-5万">3-5万</option>
-              <option value="5-10万">5-10万</option>
-              <option value="10万以上">10万以上</option>
-            </select>
-          </div>
-          <div class="field-group">
-            <label>月租金</label>
-            <select name="rent">
-              <option value="">请选择</option>
-              <option value="3000元以下">3000元以下</option>
-              <option value="3000-5000元">3000-5000元</option>
-              <option value="5000-10000元">5000-10000元</option>
-              <option value="10000元以上">10000元以上</option>
-            </select>
-          </div>
-          <div class="field-group">
-            <label>店铺位置</label>
-            <select name="location">
-              <option value="">请选择</option>
-              <option value="商业街/步行街">商业街/步行街</option>
-              <option value="社区底商">社区底商</option>
-              <option value="商场/购物中心">商场/购物中心</option>
-              <option value="写字楼/办公区">写字楼/办公区</option>
-              <option value="学校周边">学校周边</option>
-            </select>
-          </div>
-          <div class="field-group">
-            <label>经营面积（㎡）</label>
-            <input type="text" name="area" placeholder="如：50">
-          </div>
-        </div>
-      </div>
+<!-- 维度2：成交 -->
+<div class="card">
+<div class="card-title">💰 成交分析</div>
+<div class="card-sub">了解客人进店后的成交情况</div>
+<div class="q"><div class="q-label">Q4. 进店的客人大概有多大比例最终买单？ <span class="r">*</span></div>
+<div class="opt" data-n="q4"><input type="radio" name="q4" value="不到30%"><span class="txt">不到30%</span></div>
+<div class="opt" data-n="q4"><input type="radio" name="q4" value="30%-50%"><span class="txt">30%-50%</span></div>
+<div class="opt" data-n="q4"><input type="radio" name="q4" value="50%-70%"><span class="txt">50%-70%</span></div>
+<div class="opt" data-n="q4"><input type="radio" name="q4" value="70%以上"><span class="txt">70%以上</span></div></div>
+<div class="q"><div class="q-label">Q5. 客人没有成交的主要原因？ <span class="r">*</span></div>
+<div class="opt" data-n="q5"><input type="radio" name="q5" value="觉得价格太贵"><span class="txt">觉得价格太贵</span></div>
+<div class="opt" data-n="q5"><input type="radio" name="q5" value="服务体验不满意"><span class="txt">服务/体验不满意</span></div>
+<div class="opt" data-n="q5"><input type="radio" name="q5" value="看看就走没有原因"><span class="txt">看看就走，没有明确原因</span></div>
+<div class="opt" data-n="q5"><input type="radio" name="q5" value="不清楚"><span class="txt">不太清楚</span></div></div>
+<div class="q"><div class="q-label">Q6. 你是否关注客人在店里的停留时长？ <span class="r">*</span></div>
+<div class="opt" data-n="q6"><input type="radio" name="q6" value="从不关注"><span class="txt">从不关注</span></div>
+<div class="opt" data-n="q6"><input type="radio" name="q6" value="偶尔看看"><span class="txt">偶尔看看</span></div>
+<div class="opt" data-n="q6"><input type="radio" name="q6" value="比较关注"><span class="txt">比较关注</span></div>
+<div class="opt" data-n="q6"><input type="radio" name="q6" value="有系统记录"><span class="txt">有系统记录和分析</span></div></div>
+</div>
 
-      <!-- ======== 维度1：客流 ======== -->
-      <div class="section-card">
-        <div class="section-title">🚶 客流分析 <span class="section-badge">维度一</span></div>
-        <div class="section-subtitle">了解你店里的客流量情况</div>
+<!-- 维度3：利润 -->
+<div class="card">
+<div class="card-title">📊 利润分析</div>
+<div class="card-sub">了解店铺的盈利和成本控制情况</div>
+<div class="q"><div class="q-label">Q7. 你每个月利润核算得清楚吗？ <span class="r">*</span></div>
+<div class="opt" data-n="q7"><input type="radio" name="q7" value="算不清"><span class="txt">算不清，只知道大概赚没赚钱</span></div>
+<div class="opt" data-n="q7"><input type="radio" name="q7" value="只算营收"><span class="txt">只算营收，不算成本</span></div>
+<div class="opt" data-n="q7"><input type="radio" name="q7" value="有简单记账"><span class="txt">有简单记账</span></div>
+<div class="opt" data-n="q7"><input type="radio" name="q7" value="有完善核算"><span class="txt">有完善的财务核算</span></div></div>
+<div class="q"><div class="q-label">Q8. 你对店铺各项成本了解多少？ <span class="r">*</span></div>
+<div class="opt" data-n="q8"><input type="radio" name="q8" value="不太清楚"><span class="txt">不太清楚各项具体成本</span></div>
+<div class="opt" data-n="q8"><input type="radio" name="q8" value="知道大概比例"><span class="txt">知道大概比例</span></div>
+<div class="opt" data-n="q8"><input type="radio" name="q8" value="清楚大部分"><span class="txt">清楚大部分成本</span></div>
+<div class="opt" data-n="q8"><input type="radio" name="q8" value="有详细分析"><span class="txt">有详细的成本分析</span></div></div>
+<div class="q"><div class="q-label">Q9. 你的核心产品/服务的毛利率大概多少？ <span class="r">*</span></div>
+<div class="opt" data-n="q9"><input type="radio" name="q9" value="不到30%"><span class="txt">不到30%</span></div>
+<div class="opt" data-n="q9"><input type="radio" name="q9" value="30%-50%"><span class="txt">30%-50%</span></div>
+<div class="opt" data-n="q9"><input type="radio" name="q9" value="50%-70%"><span class="txt">50%-70%</span></div>
+<div class="opt" data-n="q9"><input type="radio" name="q9" value="70%以上"><span class="txt">70%以上</span></div></div>
+</div>
 
-        <div class="question">
-          <div class="question-label">Q1. 每天大概有多少人进店？ <span class="required">*</span></div>
-          <div class="options" data-name="q1_flow_people" data-required="true">
-            <label class="option-item"><input type="radio" name="q1_flow_people" value="不到30人"><span class="option-text">不到30人</span></label>
-            <label class="option-item"><input type="radio" name="q1_flow_people" value="30-60人"><span class="option-text">30-60人</span></label>
-            <label class="option-item"><input type="radio" name="q1_flow_people" value="60-100人"><span class="option-text">60-100人</span></label>
-            <label class="option-item"><input type="radio" name="q1_flow_people" value="100人以上"><span class="option-text">100人以上</span></label>
-          </div>
-        </div>
+<!-- 维度4：推广 -->
+<div class="card">
+<div class="card-title">📢 推广分析</div>
+<div class="card-sub">了解你的推广投入和效果</div>
+<div class="q"><div class="q-label">Q10. 你每个月在推广上投入多少钱？ <span class="r">*</span></div>
+<div class="opt" data-n="q10"><input type="radio" name="q10" value="基本不投入"><span class="txt">基本不投入</span></div>
+<div class="opt" data-n="q10"><input type="radio" name="q10" value="不到1000元"><span class="txt">不到1000元</span></div>
+<div class="opt" data-n="q10"><input type="radio" name="q10" value="1000-5000元"><span class="txt">1000-5000元</span></div>
+<div class="opt" data-n="q10"><input type="radio" name="q10" value="5000元以上"><span class="txt">5000元以上</span></div></div>
+<div class="q"><div class="q-label">Q11. 你怎么判断推广效果好不好？ <span class="r">*</span></div>
+<div class="opt" data-n="q11"><input type="radio" name="q11" value="没判断过"><span class="txt">没判断过/凭感觉</span></div>
+<div class="opt" data-n="q11"><input type="radio" name="q11" value="看来问的人多不多"><span class="txt">看来问的人多不多</span></div>
+<div class="opt" data-n="q11"><input type="radio" name="q11" value="有简单跟踪"><span class="txt">有简单的数据跟踪</span></div>
+<div class="opt" data-n="q11"><input type="radio" name="q11" value="有系统分析"><span class="txt">有系统的ROI分析</span></div></div>
+<div class="q"><div class="q-label">Q12. 你目前用过哪些推广渠道？（可多选） <span class="r">*</span></div>
+<div class="opt" data-n="q12"><input type="checkbox" value="美团/大众点评"><span class="txt">美团/大众点评</span></div>
+<div class="opt" data-n="q12"><input type="checkbox" value="抖音/快手"><span class="txt">抖音/快手</span></div>
+<div class="opt" data-n="q12"><input type="checkbox" value="微信朋友圈/社群"><span class="txt">微信朋友圈/社群</span></div>
+<div class="opt" data-n="q12"><input type="checkbox" value="线下发传单"><span class="txt">线下发传单</span></div>
+<div class="opt" data-n="q12"><input type="checkbox" value="基本没有推广"><span class="txt">基本没有推广</span></div></div>
+</div>
 
-        <div class="question">
-          <div class="question-label">Q2. 你认为客流不足的主要原因是？ <span class="required">*</span></div>
-          <div class="options" data-name="q2_flow_reason" data-required="true">
-            <label class="option-item"><input type="radio" name="q2_flow_reason" value="周边竞品太多"><span class="option-text">周边竞品太多，分流严重</span></label>
-            <label class="option-item"><input type="radio" name="q2_flow_reason" value="位置太偏"><span class="option-text">店铺位置比较偏</span></label>
-            <label class="option-item"><input type="radio" name="q2_flow_reason" value="宣传不够"><span class="option-text">宣传推广不够</span></label>
-            <label class="option-item"><input type="radio" name="q2_flow_reason" value="说不清楚"><span class="option-text">说不清楚具体原因</span></label>
-          </div>
-        </div>
+<!-- 维度5：复购 -->
+<div class="card">
+<div class="card-title">🔄 复购分析</div>
+<div class="card-sub">了解客户回头率和老客维护情况</div>
+<div class="q"><div class="q-label">Q13. 回头客大概占所有客人的比例？ <span class="r">*</span></div>
+<div class="opt" data-n="q13"><input type="radio" name="q13" value="不到10%"><span class="txt">不到10%</span></div>
+<div class="opt" data-n="q13"><input type="radio" name="q13" value="10%-20%"><span class="txt">10%-20%</span></div>
+<div class="opt" data-n="q13"><input type="radio" name="q13" value="20%-40%"><span class="txt">20%-40%</span></div>
+<div class="opt" data-n="q13"><input type="radio" name="q13" value="40%以上"><span class="txt">40%以上</span></div></div>
+<div class="q"><div class="q-label">Q14. 你平时怎么维护老客户？ <span class="r">*</span></div>
+<div class="opt" data-n="q14"><input type="radio" name="q14" value="基本没有维护"><span class="txt">基本没有维护</span></div>
+<div class="opt" data-n="q14"><input type="radio" name="q14" value="偶尔微信联系"><span class="txt">偶尔微信联系一下</span></div>
+<div class="opt" data-n="q14"><input type="radio" name="q14" value="有微信群"><span class="txt">有微信群在运营</span></div>
+<div class="opt" data-n="q14"><input type="radio" name="q14" value="有会员体系"><span class="txt">有会员/积分体系</span></div></div>
+<div class="q"><div class="q-label">Q15. 你觉得客人不再来的主要原因是？ <span class="r">*</span></div>
+<div class="opt" data-n="q15"><input type="radio" name="q15" value="品质不稳定"><span class="txt">产品/服务品质不稳定</span></div>
+<div class="opt" data-n="q15"><input type="radio" name="q15" value="周边有更好的选择"><span class="txt">周边有更好的选择</span></div>
+<div class="opt" data-n="q15"><input type="radio" name="q15" value="没有联系渠道"><span class="txt">客人走了就联系不上了</span></div>
+<div class="opt" data-n="q15"><input type="radio" name="q15" value="不清楚"><span class="txt">不太清楚</span></div></div>
+</div>
 
-        <div class="question">
-          <div class="question-label">Q3. 你是否有统计门前客流？（每天多少人经过、多少人进店） <span class="required">*</span></div>
-          <div class="options" data-name="q3_flow_tracking" data-required="true">
-            <label class="option-item"><input type="radio" name="q3_flow_tracking" value="完全没有统计"><span class="option-text">完全没有统计</span></label>
-            <label class="option-item"><input type="radio" name="q3_flow_tracking" value="凭感觉大概知道"><span class="option-text">凭感觉大概知道</span></label>
-            <label class="option-item"><input type="radio" name="q3_flow_tracking" value="偶尔数一下"><span class="option-text">偶尔会数一下</span></label>
-            <label class="option-item"><input type="radio" name="q3_flow_tracking" value="有系统化统计"><span class="option-text">有系统化统计</span></label>
-          </div>
-        </div>
-      </div>
+<!-- 维度6：管理 -->
+<div class="card">
+<div class="card-title">👥 管理分析</div>
+<div class="card-sub">了解店铺管理和团队情况</div>
+<div class="q"><div class="q-label">Q16. 你每天在店里的时长大概多久？ <span class="r">*</span></div>
+<div class="opt" data-n="q16"><input type="radio" name="q16" value="几乎全天在店"><span class="txt">几乎全天在店（12小时以上）</span></div>
+<div class="opt" data-n="q16"><input type="radio" name="q16" value="大部分时间在"><span class="txt">大部分时间在（8-12小时）</span></div>
+<div class="opt" data-n="q16"><input type="radio" name="q16" value="一半时间在"><span class="txt">一半时间在（4-8小时）</span></div>
+<div class="opt" data-n="q16"><input type="radio" name="q16" value="偶尔在店"><span class="txt">偶尔在店（不到4小时）</span></div></div>
+<div class="q"><div class="q-label">Q17. 你不在店的时候，店里能正常运转吗？ <span class="r">*</span></div>
+<div class="opt" data-n="q17"><input type="radio" name="q17" value="完全不行"><span class="txt">完全不行，我一走就出问题</span></div>
+<div class="opt" data-n="q17"><input type="radio" name="q17" value="勉强能转"><span class="txt">勉强能转，但效率低</span></div>
+<div class="opt" data-n="q17"><input type="radio" name="q17" value="基本能运转"><span class="txt">基本能正常运转</span></div>
+<div class="opt" data-n="q17"><input type="radio" name="q17" value="完全没问题"><span class="txt">完全没问题，有店长管理</span></div></div>
+<div class="q"><div class="q-label">Q18. 员工是否有标准化的操作流程（SOP）？ <span class="r">*</span></div>
+<div class="opt" data-n="q18"><input type="radio" name="q18" value="完全没有"><span class="txt">完全没有</span></div>
+<div class="opt" data-n="q18"><input type="radio" name="q18" value="口头交代"><span class="txt">口头交代了一些</span></div>
+<div class="opt" data-n="q18"><input type="radio" name="q18" value="有部分书面"><span class="txt">有部分书面流程</span></div>
+<div class="opt" data-n="q18"><input type="radio" name="q18" value="有完善SOP"><span class="txt">有完善的SOP并执行</span></div></div>
+</div>
 
-      <!-- ======== 维度2：成交 ======== -->
-      <div class="section-card">
-        <div class="section-title">💰 成交分析 <span class="section-badge">维度二</span></div>
-        <div class="section-subtitle">了解客人进店后的成交情况</div>
+<!-- 补充信息 -->
+<div class="card">
+<div class="card-title">✏️ 补充信息</div>
+<div class="card-sub">你的自我判断和期望</div>
+<div class="fg"><label>你觉得目前经营中最大的问题是什么？ <span class="r">*</span></label><input type="text" name="main_problem" required placeholder="如：店里没人来、利润太低……"></div>
+<div class="fg"><label>如果问题解决了，你希望每月多赚多少钱？</label><input type="text" name="expected_gain" placeholder="如：多赚5000元"></div>
+<div class="q"><div class="q-label">你自己觉得哪几个方面问题最大？（可多选）</div>
+<div class="opt" data-n="self"><input type="checkbox" value="客流"><span class="txt">客流</span></div>
+<div class="opt" data-n="self"><input type="checkbox" value="成交"><span class="txt">成交</span></div>
+<div class="opt" data-n="self"><input type="checkbox" value="利润"><span class="txt">利润</span></div>
+<div class="opt" data-n="self"><input type="checkbox" value="推广"><span class="txt">推广</span></div>
+<div class="opt" data-n="self"><input type="checkbox" value="复购"><span class="txt">复购</span></div>
+<div class="opt" data-n="self"><input type="checkbox" value="管理"><span class="txt">管理</span></div></div>
+<div class="fg"><label>还有其他想补充的吗？</label><textarea name="notes" placeholder="任何你想告诉顾问的信息……"></textarea></div>
+</div>
 
-        <div class="question">
-          <div class="question-label">Q4. 进店的客人大概有多大比例最终买单？ <span class="required">*</span></div>
-          <div class="options" data-name="q4_conversion_rate" data-required="true">
-            <label class="option-item"><input type="radio" name="q4_conversion_rate" value="不到30%"><span class="option-text">不到 30%</span></label>
-            <label class="option-item"><input type="radio" name="q4_conversion_rate" value="30%-50%"><span class="option-text">30%-50%</span></label>
-            <label class="option-item"><input type="radio" name="q4_conversion_rate" value="50%-70%"><span class="option-text">50%-70%</span></label>
-            <label class="option-item"><input type="radio" name="q4_conversion_rate" value="70%以上"><span class="option-text">70% 以上</span></label>
-          </div>
-        </div>
+<div class="submit-area">
+<button type="submit" class="btn" id="btnS">提交自诊表</button>
+<p style="margin-top:10px;font-size:12px;color:#999">提交即表示你同意我们使用你的数据进行经营诊断分析</p>
+</div>
+</form>
+</div>
 
-        <div class="question">
-          <div class="question-label">Q5. 客人没有成交的主要原因？ <span class="required">*</span></div>
-          <div class="options" data-name="q5_loss_reason" data-required="true">
-            <label class="option-item"><input type="radio" name="q5_loss_reason" value="觉得价格太贵"><span class="option-text">觉得价格太贵</span></label>
-            <label class="option-item"><input type="radio" name="q5_loss_reason" value="服务体验不满意"><span class="option-text">服务/体验不满意</span></label>
-            <label class="option-item"><input type="radio" name="q5_loss_reason" value="看看就走没有原因"><span class="option-text">看看就走，没有明确原因</span></label>
-            <label class="option-item"><input type="radio" name="q5_loss_reason" value="不清楚"><span class="option-text">不太清楚</span></label>
-          </div>
-        </div>
+<div class="s-page" id="sPage">
+<div class="icon">✅</div>
+<h2>提交成功！</h2>
+<p>感谢你完成自诊表！<br>顾问将在1-2个工作日内联系你，<br>并出具个性化的经营诊断报告。</p>
+</div>
 
-        <div class="question">
-          <div class="question-label">Q6. 你是否关注客人在店里的停留时长？ <span class="required">*</span></div>
-          <div class="options" data-name="q6_stay_time" data-required="true">
-            <label class="option-item"><input type="radio" name="q6_stay_time" value="从不关注"><span class="option-text">从不关注</span></label>
-            <label class="option-item"><input type="radio" name="q6_stay_time" value="偶尔看看"><span class="option-text">偶尔看看</span></label>
-            <label class="option-item"><input type="radio" name="q6_stay_time" value="比较关注"><span class="option-text">比较关注</span></label>
-            <label class="option-item"><input type="radio" name="q6_stay_time" value="有系统记录"><span class="option-text">有系统记录和分析</span></label>
-          </div>
-        </div>
-      </div>
+<div class="msg" id="msg"></div>
 
-      <!-- ======== 维度3：利润 ======== -->
-      <div class="section-card">
-        <div class="section-title">📊 利润分析 <span class="section-badge">维度三</span></div>
-        <div class="section-subtitle">了解店铺的盈利和成本控制情况</div>
+<script>
+// ===== 配置 =====
+var SU = 'https://quncytlifkaqcgpmjmeh.supabase.co';
+var AK = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF1bmN5dGxpZmthcWNncG1qbWVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzNjgxMTYsImV4cCI6MjA5NDk0NDExNn0.xhGD9zWq5JwQA_KNhW9bbvo3Mg5cLlCHWTKLbInjZsc';
 
-        <div class="question">
-          <div class="question-label">Q7. 你每个月利润核算得清楚吗？ <span class="required">*</span></div>
-          <div class="options" data-name="q7_profit_clarity" data-required="true">
-            <label class="option-item"><input type="radio" name="q7_profit_clarity" value="算不清"><span class="option-text">算不清，只知道大概赚没赚钱</span></label>
-            <label class="option-item"><input type="radio" name="q7_profit_clarity" value="只算营收"><span class="option-text">只算营收，不算成本</span></label>
-            <label class="option-item"><input type="radio" name="q7_profit_clarity" value="有简单记账"><span class="option-text">有简单记账</span></label>
-            <label class="option-item"><input type="radio" name="q7_profit_clarity" value="有完善核算"><span class="option-text">有完善的财务核算</span></label>
-          </div>
-        </div>
-
-        <div class="question">
-          <div class="question-label">Q8. 你对店铺各项成本（房租/人工/水电/食材）了解多少？ <span class="required">*</span></div>
-          <div class="options" data-name="q8_cost_awareness" data-required="true">
-            <label class="option-item"><input type="radio" name="q8_cost_awareness" value="不太清楚"><span class="option-text">不太清楚各项具体成本</span></label>
-            <label class="option-item"><input type="radio" name="q8_cost_awareness" value="知道大概比例"><span class="option-text">知道大概比例</span></label>
-            <label class="option-item"><input type="radio" name="q8_cost_awareness" value="清楚大部分"><span class="option-text">清楚大部分成本</span></label>
-            <label class="option-item"><input type="radio" name="q8_cost_awareness" value="有详细分析"><span class="option-text">有详细的成本分析</span></label>
-          </div>
-        </div>
-
-        <div class="question">
-          <div class="question-label">Q9. 你的核心产品/服务的毛利率大概多少？ <span class="required">*</span></div>
-          <div class="options" data-name="q9_product_margin" data-required="true">
-            <label class="option-item"><input type="radio" name="q9_product_margin" value="不到30%"><span class="option-text">不到 30%</span></label>
-            <label class="option-item"><input type="radio" name="q9_product_margin" value="30%-50%"><span class="option-text">30%-50%</span></label>
-            <label class="option-item"><input type="radio" name="q9_product_margin" value="50%-70%"><span class="option-text">50%-70%</span></label>
-            <label class="option-item"><input type="radio" name="q9_product_margin" value="70%以上"><span class="option-text">70% 以上</span></label>
-          </div>
-        </div>
-      </div>
-
-      <!-- ======== 维度4：推广 ======== -->
-      <div class="section-card">
-        <div class="section-title">📢 推广分析 <span class="section-badge">维度四</span></div>
-        <div class="section-subtitle">了解你的推广投入和效果</div>
-
-        <div class="question">
-          <div class="question-label">Q10. 你每个月在推广上投入多少钱？ <span class="required">*</span></div>
-          <div class="options" data-name="q10_marketing_budget" data-required="true">
-            <label class="option-item"><input type="radio" name="q10_marketing_budget" value="基本不投入"><span class="option-text">基本不投入</span></label>
-            <label class="option-item"><input type="radio" name="q10_marketing_budget" value="不到1000元"><span class="option-text">不到 1000 元</span></label>
-            <label class="option-item"><input type="radio" name="q10_marketing_budget" value="1000-5000元"><span class="option-text">1000-5000 元</span></label>
-            <label class="option-item"><input type="radio" name="q10_marketing_budget" value="5000元以上"><span class="option-text">5000 元以上</span></label>
-          </div>
-        </div>
-
-        <div class="question">
-          <div class="question-label">Q11. 你怎么判断推广效果好不好？ <span class="required">*</span></div>
-          <div class="options" data-name="q11_marketing_effect" data-required="true">
-            <label class="option-item"><input type="radio" name="q11_marketing_effect" value="没判断过"><span class="option-text">没判断过 / 凭感觉</span></label>
-            <label class="option-item"><input type="radio" name="q11_marketing_effect" value="看来问的人多不多"><span class="option-text">看来问的人多不多</span></label>
-            <label class="option-item"><input type="radio" name="q11_marketing_effect" value="有简单跟踪"><span class="option-text">有简单的数据跟踪</span></label>
-            <label class="option-item"><input type="radio" name="q11_marketing_effect" value="有系统分析"><span class="option-text">有系统的 ROI 分析</span></label>
-          </div>
-        </div>
-
-        <div class="question">
-          <div class="question-label">Q12. 你目前用过哪些推广渠道？（可多选） <span class="required">*</span></div>
-          <div class="options" data-name="q12_marketing_channels" data-required="true" data-multi="true">
-            <label class="option-item"><input type="checkbox" name="q12_marketing_channels" value="美团/大众点评"><span class="option-text">美团 / 大众点评</span></label>
-            <label class="option-item"><input type="checkbox" name="q12_marketing_channels" value="抖音/快手"><span class="option-text">抖音 / 快手</span></label>
-            <label class="option-item"><input type="checkbox" name="q12_marketing_channels" value="微信朋友圈/社群"><span class="option-text">微信朋友圈 / 社群</span></label>
-            <label class="option-item"><input type="checkbox" name="q12_marketing_channels" value="线下发传单"><span class="option-text">线下发传单</span></label>
-            <label class="option-item"><input type="checkbox" name="q12_marketing_channels" value="基本没有推广"><span class="option-text">基本没有推广</span></label>
-          </div>
-        </div>
-      </div>
-
-      <!-- ======== 维度5：复购 ======== -->
-      <div class="section-card">
-        <div class="section-title">🔄 复购分析 <span class="section-badge">维度五</span></div>
-        <div class="section-subtitle">了解客户回头率和老客维护情况</div>
-
-        <div class="question">
-          <div class="question-label">Q13. 回头客大概占所有客人的比例？ <span class="required">*</span></div>
-          <div class="options" data-name="q13_return_rate" data-required="true">
-            <label class="option-item"><input type="radio" name="q13_return_rate" value="不到10%"><span class="option-text">不到 10%</span></label>
-            <label class="option-item"><input type="radio" name="q13_return_rate" value="10%-20%"><span class="option-text">10%-20%</span></label>
-            <label class="option-item"><input type="radio" name="q13_return_rate" value="20%-40%"><span class="option-text">20%-40%</span></label>
-            <label class="option-item"><input type="radio" name="q13_return_rate" value="40%以上"><span class="option-text">40% 以上</span></label>
-          </div>
-        </div>
-
-        <div class="question">
-          <div class="question-label">Q14. 你平时怎么维护老客户？ <span class="required">*</span></div>
-          <div class="options" data-name="q14_retention_method" data-required="true">
-            <label class="option-item"><input type="radio" name="q14_retention_method" value="基本没有维护"><span class="option-text">基本没有维护</span></label>
-            <label class="option-item"><input type="radio" name="q14_retention_method" value="偶尔微信联系"><span class="option-text">偶尔微信联系一下</span></label>
-            <label class="option-item"><input type="radio" name="q14_retention_method" value="有微信群"><span class="option-text">有微信群在运营</span></label>
-            <label class="option-item"><input type="radio" name="q14_retention_method" value="有会员体系"><span class="option-text">有会员 / 积分体系</span></label>
-          </div>
-        </div>
-
-        <div class="question">
-          <div class="question-label">Q15. 你觉得客人不再来的主要原因是？ <span class="required">*</span></div>
-          <div class="options" data-name="q15_churn_reason" data-required="true">
-            <label class="option-item"><input type="radio" name="q15_churn_reason" value="品质不稳定"><span class="option-text">产品/服务品质不稳定</span></label>
-            <label class="option-item"><input type="radio" name="q15_churn_reason" value="周边有更好的选择"><span class="option-text">周边有更好的选择</span></label>
-            <label class="option-item"><input type="radio" name="q15_churn_reason" value="没有联系渠道"><span class="option-text">客人走了就联系不上了</span></label>
-            <label class="option-item"><input type="radio" name="q15_churn_reason" value="不清楚"><span class="option-text">不太清楚</span></label>
-          </div>
-        </div>
-      </div>
-
-      <!-- ======== 维度6：管理 ======== -->
-      <div class="section-card">
-        <div class="section-title">👥 管理分析 <span class="section-badge">维度六</span></div>
-        <div class="section-subtitle">了解店铺管理和团队情况</div>
-
-        <div class="question">
-          <div class="question-label">Q16. 你每天在店里的时长大概多久？ <span class="required">*</span></div>
-          <div class="options" data-name="q16_owner_hours" data-required="true">
-            <label class="option-item"><input type="radio" name="q16_owner_hours" value="几乎全天在店"><span class="option-text">几乎全天在店（12小时以上）</span></label>
-            <label class="option-item"><input type="radio" name="q16_owner_hours" value="大部分时间在"><span class="option-text">大部分时间在（8-12小时）</span></label>
-            <label class="option-item"><input type="radio" name="q16_owner_hours" value="一半时间在"><span class="option-text">一半时间在（4-8小时）</span></label>
-            <label class="option-item"><input type="radio" name="q16_owner_hours" value="偶尔在店"><span class="option-text">偶尔在店（不到4小时）</span></label>
-          </div>
-        </div>
-
-        <div class="question">
-          <div class="question-label">Q17. 你不在店的时候，店里能正常运转吗？ <span class="required">*</span></div>
-          <div class="options" data-name="q17_operation_without_owner" data-required="true">
-            <label class="option-item"><input type="radio" name="q17_operation_without_owner" value="完全不行"><span class="option-text">完全不行，我一走就出问题</span></label>
-            <label class="option-item"><input type="radio" name="q17_operation_without_owner" value="勉强能转"><span class="option-text">勉强能转，但效率低</span></label>
-            <label class="option-item"><input type="radio" name="q17_operation_without_owner" value="基本能运转"><span class="option-text">基本能正常运转</span></label>
-            <label class="option-item"><input type="radio" name="q17_operation_without_owner" value="完全没问题"><span class="option-text">完全没问题，有店长管理</span></label>
-          </div>
-        </div>
-
-        <div class="question">
-          <div class="question-label">Q18. 员工是否有标准化的操作流程（SOP）？ <span class="required">*</span></div>
-          <div class="options" data-name="q18_sop_status" data-required="true">
-            <label class="option-item"><input type="radio" name="q18_sop_status" value="完全没有"><span class="option-text">完全没有</span></label>
-            <label class="option-item"><input type="radio" name="q18_sop_status" value="口头交代"><span class="option-text">口头交代了一些</span></label>
-            <label class="option-item"><input type="radio" name="q18_sop_status" value="有部分书面"><span class="option-text">有部分书面流程</span></label>
-            <label class="option-item"><input type="radio" name="q18_sop_status" value="有完善SOP"><span class="option-text">有完善的 SOP 并执行</span></label>
-          </div>
-        </div>
-      </div>
-
-      <!-- ======== 补充信息 ======== -->
-      <div class="section-card">
-        <div class="section-title">✏️ 补充信息</div>
-        <div class="section-subtitle">你的自我判断和期望</div>
-
-        <div class="question">
-          <div class="question-label">你觉得目前经营中最大的问题是什么？ <span class="required">*</span></div>
-          <input type="text" name="main_problem" required placeholder="如：店里没人来、利润太低……">
-        </div>
-
-        <div class="question">
-          <div class="question-label">如果问题解决了，你希望每月多赚多少钱？</div>
-          <input type="text" name="expected_gain" placeholder="如：多赚 5000 元">
-        </div>
-
-        <div class="question">
-          <div class="question-label">你自己觉得哪几个方面问题最大？（可多选）</div>
-          <div class="options" data-name="self_diagnosis" data-multi="true">
-            <label class="option-item"><input type="checkbox" name="self_diagnosis" value="客流"><span class="option-text">客流</span></label>
-            <label class="option-item"><input type="checkbox" name="self_diagnosis" value="成交"><span class="option-text">成交</span></label>
-            <label class="option-item"><input type="checkbox" name="self_diagnosis" value="利润"><span class="option-text">利润</span></label>
-            <label class="option-item"><input type="checkbox" name="self_diagnosis" value="推广"><span class="option-text">推广</span></label>
-            <label class="option-item"><input type="checkbox" name="self_diagnosis" value="复购"><span class="option-text">复购</span></label>
-            <label class="option-item"><input type="checkbox" name="self_diagnosis" value="管理"><span class="option-text">管理</span></label>
-          </div>
-        </div>
-
-        <div class="question">
-          <div class="question-label">还有其他想补充的吗？</div>
-          <textarea name="notes" placeholder="任何你想告诉顾问的信息……"></textarea>
-        </div>
-      </div>
-
-      <!-- 提交 -->
-      <div class="submit-area">
-        <button type="submit" class="btn-submit" id="btnSubmit">
-          提交自诊表
-        </button>
-        <p style="margin-top:12px; font-size:12px; color:#999;">
-          提交即表示你同意我们使用你的数据进行经营诊断分析
-        </p>
-      </div>
-    </form>
-  </div>
-
-  <!-- ===== 提交成功页面 ===== -->
-  <div class="success-page" id="successPage">
-    <div class="icon">✅</div>
-    <h2>提交成功！</h2>
-    <p>
-      感谢你完成自诊表！<br>
-      顾问将在 1-2 个工作日内联系你，<br>
-      并出具个性化的经营诊断报告。<br><br>
-      如有紧急问题，可联系你的专属顾问。
-    </p>
-  </div>
-
-  <script>
-    // ===== 初始化 Supabase（动态加载，不阻塞页面渲染） =====
-    const SUPABASE_URL = 'https://quncytlifkaqcgpmjmeh.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF1bmN5dGxpZmthcWNncG1qbWVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzNjgxMTYsImV4cCI6MjA5NDk0NDExNn0.xhGD9zWq5JwQA_KNhW9bbvo3Mg5cLlCHWTKLbInjZsc';
-    let supabaseClient = null;
-
-    function getSupabase() {
-      return new Promise(function(resolve, reject) {
-        if (supabaseClient) { resolve(supabaseClient); return; }
-        if (typeof window.supabase !== 'undefined') {
-          supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-          resolve(supabaseClient);
-          return;
-        }
-        var s = document.createElement('script');
-        s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
-        s.onload = function() {
-          supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-          resolve(supabaseClient);
-        };
-        s.onerror = function() { reject(new Error('网络加载失败，请检查网络后重试')); };
-        document.head.appendChild(s);
-      });
+// ===== 选项点击交互 =====
+document.querySelectorAll('.opt').forEach(function(el) {
+  el.addEventListener('click', function() {
+    var inp = this.querySelector('input');
+    if (!inp) return;
+    if (inp.type === 'radio') {
+      var grp = this.closest('.q').querySelectorAll('.opt');
+      grp.forEach(function(o) { o.classList.remove('sel'); });
+      this.classList.add('sel');
+      inp.checked = true;
+    } else {
+      this.classList.toggle('sel');
+      inp.checked = !inp.checked;
     }
+  });
+});
 
-    // ===== 选项点击交互 =====
-    document.querySelectorAll('.option-item').forEach(item => {
-      item.addEventListener('click', function(e) {
-        const input = this.querySelector('input');
-        if (!input) return;
+// ===== 表单提交 =====
+document.getElementById('f').addEventListener('submit', async function(e) {
+  e.preventDefault();
 
-        if (input.type === 'radio') {
-          // radio: 清除同组选中状态，选中当前
-          const group = this.closest('.options');
-          group.querySelectorAll('.option-item').forEach(o =>
-            o.classList.remove('selected')
-          );
-          this.classList.add('selected');
-          input.checked = true;
-        } else if (input.type === 'checkbox') {
-          // checkbox: 切换选中状态
-          this.classList.toggle('selected');
-          input.checked = !input.checked;
-        }
+  // 收集数据
+  var d = {};
+  var els = this.querySelectorAll('[name]');
+  els.forEach(function(el) {
+    if (el.type === 'radio') {
+      if (el.checked) d[el.name] = el.value;
+    } else if (el.type === 'checkbox') {
+      if (el.checked) {
+        if (!d[el.name]) d[el.name] = [];
+        d[el.name].push(el.value);
+      }
+    } else if (el.tagName === 'SELECT' || el.type === 'text' || el.type === 'tel') {
+      d[el.name] = el.value;
+    } else if (el.tagName === 'TEXTAREA') {
+      d[el.name] = el.value;
+    }
+  });
 
-        // 触发 change 事件
-        input.dispatchEvent(new Event('change', { bubbles: true }));
-      });
+  // 字段名映射（数据库字段名）
+  var fmap = {
+    'q1':'q1_flow_people','q2':'q2_flow_reason','q3':'q3_flow_tracking',
+    'q4':'q4_conversion_rate','q5':'q5_loss_reason','q6':'q6_stay_time',
+    'q7':'q7_profit_clarity','q8':'q8_cost_awareness','q9':'q9_product_margin',
+    'q10':'q10_marketing_budget','q11':'q11_marketing_effect','q12':'q12_marketing_channels',
+    'q13':'q13_return_rate','q14':'q14_retention_method','q15':'q15_churn_reason',
+    'q16':'q16_owner_hours','q17':'q17_operation_without_owner','q18':'q18_sop_status',
+    'self':'self_diagnosis'
+  };
+
+  var payload = {
+    store_name: d.store_name, owner_name: d.owner_name, phone: d.phone,
+    category: d.category, open_time: d.open_time, employees: d.employees,
+    monthly_revenue: d.monthly_revenue, rent: d.rent, location: d.location,
+    area: d.area, main_problem: d.main_problem, expected_gain: d.expected_gain,
+    notes: d.notes
+  };
+
+  // 映射6维度
+  for (var k in fmap) {
+    if (d[k]) {
+      payload[fmap[k]] = Array.isArray(d[k]) ? d[k].join('、') : d[k];
+    }
+  }
+
+  // 提交
+  var btn = document.getElementById('btnS');
+  btn.disabled = true;
+  btn.textContent = '提交中…';
+
+  try {
+    var r = await fetch(SU + '/rest/v1/submissions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': AK,
+        'Authorization': 'Bearer ' + AK,
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify([payload])
     });
+    if (!r.ok) throw new Error('提交失败(' + r.status + ')' + await r.text().catch(function() {return '';}));
 
-    // ===== 进度条 =====
-    function updateProgress() {
-      const total = 18; // Q1-Q18
-      let answered = 0;
+    document.getElementById('formArea').style.display = 'none';
+    document.getElementById('sPage').style.display = 'block';
 
-      const questions = document.querySelectorAll('[data-name][data-required="true"]:not([data-multi])');
-      questions.forEach(q => {
-        const checked = q.querySelector('input[type="radio"]:checked');
-        if (checked) answered++;
-      });
+  } catch (err) {
+    showMsg('提交失败：' + err.message);
+    btn.disabled = false;
+    btn.textContent = '提交自诊表';
+  }
+});
 
-      // 多选问题
-      document.querySelectorAll('[data-name][data-required="true"][data-multi]').forEach(q => {
-        const checked = q.querySelectorAll('input[type="checkbox"]:checked');
-        if (checked.length > 0) answered++;
-      });
-
-      const pct = Math.min(Math.round((answered / total) * 100), 100);
-      const dots = document.querySelectorAll('.progress-dot');
-      const dotCount = dots.length;
-
-      dots.forEach((dot, i) => {
-        dot.className = 'progress-dot';
-        const threshold = Math.round((i + 1) / dotCount * 100);
-        if (pct >= threshold) {
-          dot.classList.add('done');
-        } else {
-          // 当前未完成的第一个高亮
-        }
-      });
-
-      // 高亮当前区域
-      const currentActive = Math.floor(pct / (100 / dotCount));
-      if (dots[currentActive] && !dots[currentActive].classList.contains('done')) {
-        dots[currentActive].classList.add('active');
-      }
-    }
-
-    // 初始化进度条
-    (function initProgress() {
-      const totalDots = 7; // 基本信息 + 6个维度
-      const bar = document.getElementById('progressBar');
-      for (let i = 0; i < totalDots; i++) {
-        const dot = document.createElement('div');
-        dot.className = 'progress-dot';
-        bar.appendChild(dot);
-      }
-    })();
-
-    // 监听所有输入变化
-    document.addEventListener('change', updateProgress);
-    document.addEventListener('input', updateProgress);
-
-    // ===== 表单提交 =====
-    const form = document.getElementById('diagnosisForm');
-    const btn = document.getElementById('btnSubmit');
-
-    form.addEventListener('submit', async function(e) {
-      e.preventDefault();
-
-      // 基础验证
-      const requireds = form.querySelectorAll('[required]');
-      let valid = true;
-      requireds.forEach(el => {
-        if (!el.value.trim()) {
-          el.style.borderColor = '#e53935';
-          valid = false;
-        } else {
-          el.style.borderColor = '';
-        }
-      });
-
-      // 验证所有单选必填
-      document.querySelectorAll('[data-required="true"][data-name]').forEach(group => {
-        const name = group.dataset.name;
-        if (group.dataset.multi) {
-          const checked = group.querySelectorAll('input[type="checkbox"]:checked');
-          if (checked.length === 0) valid = false;
-        } else {
-          const checked = group.querySelector(`input[name="${name}"]:checked`);
-          if (!checked) valid = false;
-        }
-      });
-
-      if (!valid) {
-        showToast('请完成所有带 * 标记的题目');
-        return;
-      }
-
-      // 收集数据
-      const formData = new FormData(form);
-      const data = {};
-
-      // 基本信息
-      for (let [key, value] of formData.entries()) {
-        if (key === 'q12_marketing_channels' || key === 'self_diagnosis') {
-          if (!data[key]) data[key] = [];
-          data[key].push(value);
-        } else {
-          data[key] = value;
-        }
-      }
-
-      // 多选字段转逗号分隔
-      if (Array.isArray(data.q12_marketing_channels)) {
-        data.q12_marketing_channels = data.q12_marketing_channels.join('、');
-      }
-      if (Array.isArray(data.self_diagnosis)) {
-        data.self_diagnosis = data.self_diagnosis.join('、');
-      }
-
-      // 提交
-      btn.disabled = true;
-      btn.innerHTML = '<span class="loading"></span> 提交中…';
-
-      try {
-        var sb = await getSupabase();
-        var { error } = await sb
-          .from('submissions')
-          .insert([data]);
-
-        if (error) throw error;
-
-        // 成功
-        document.getElementById('formArea').style.display = 'none';
-        document.getElementById('successPage').style.display = 'block';
-        document.querySelector('.progress-bar').style.display = 'none';
-        document.querySelector('.header').innerHTML = `
-          <h1>提交成功 🎉</h1>
-          <p>感谢你的信任！顾问将尽快联系你</p>
-        `;
-
-      } catch (err) {
-        console.error('Submit error:', err);
-        showToast('提交失败：' + (err.message || '网络错误，请稍后再试'));
-        btn.disabled = false;
-        btn.textContent = '提交自诊表';
-      }
-    });
-
-    // ===== Toast =====
-    function showToast(msg) {
-      const toast = document.getElementById('toast');
-      toast.textContent = msg;
-      toast.classList.add('show');
-      setTimeout(() => toast.classList.remove('show'), 3000);
-    }
-  </script>
-
+function showMsg(t) {
+  var m = document.getElementById('msg');
+  m.textContent = t;
+  m.classList.add('show');
+  setTimeout(function() { m.classList.remove('show'); }, 4000);
+}
+</script>
 </body>
 </html>
