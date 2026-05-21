@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>诊断系统 · 管理后台</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+  </script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      background: #f0f2f5;
+      color: #333;
+      min-height: 100vh;
+    }
+
+    /* ===== 登录页 ===== */
+    .login-page {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .login-card {
+      background: white;
+      border-radius: 12px;
+      padding: 40px 32px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+    .login-card h1 {
+      font-size: 22px;
+      color: #1F4E79;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    .login-card p {
+      text-align: center;
+      color: #888;
+      font-size: 13px;
+      margin-bottom: 24px;
+    }
+    .login-card .field-group { margin-bottom: 16px; }
+    .login-card label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 5px;
+      color: #555;
+    }
+    .login-card input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    .login-card input:focus {
+      outline: none;
+      border-color: #1F4E79;
+      box-shadow: 0 0 0 3px rgba(31,78,121,0.1);
+    }
+    .btn-login {
+      width: 100%;
+      padding: 12px;
+      background: #1F4E79;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-login:hover { background: #2a6ba8; }
+    .btn-login:disabled { opacity: 0.5; cursor: not-allowed; }
+    .login-error {
+      color: #e53935;
+      font-size: 13px;
+      text-align: center;
+      margin-top: 12px;
+      display: none;
+    }
+
+    /* ===== 后台主界面 ===== */
+    .app-layout { display: none; }
+    .app-header {
+      background: #1F4E79;
+      color: white;
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .app-header h1 { font-size: 18px; }
+    .app-header .user-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 13px;
+    }
+    .btn-logout {
+      padding: 6px 14px;
+      background: rgba(255,255,255,0.15);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .btn-logout:hover { background: rgba(255,255,255,0.25); }
+
+    /* ===== 统计面板 ===== */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      padding: 16px 24px;
+    }
+    .stat-card {
+      background: white;
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .stat-card .num {
+      font-size: 28px;
+      font-weight: 700;
+      color: #1F4E79;
+    }
+    .stat-card .label {
+      font-size: 12px;
+      color: #888;
+      margin-top: 4px;
+    }
+
+    /* ===== 筛选和搜索 ===== */
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      padding: 0 24px 16px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .toolbar select,
+    .toolbar input {
+      padding: 8px 12px;
+      border: 1.5px solid #ddd;
+      border-radius: 6px;
+      font-size: 13px;
+      background: white;
+    }
+    .toolbar input { flex: 1; min-width: 160px; }
+    .toolbar select:focus, .toolbar input:focus {
+      outline: none;
+      border-color: #1F4E79;
+    }
+
+    /* ===== 表格 ===== */
+    .table-wrap {
+      padding: 0 24px 24px;
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      font-size: 13px;
+    }
+    th {
+      background: #f8f9fb;
+      padding: 12px 10px;
+      text-align: left;
+      font-weight: 600;
+      color: #555;
+      border-bottom: 1px solid #eee;
+      white-space: nowrap;
+    }
+    td {
+      padding: 10px;
+      border-bottom: 1px solid #f0f0f0;
+      vertical-align: top;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f8faff; }
+    .status-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .status-new { background: #fff3e0; color: #e65100; }
+    .status-read { background: #e3f2fd; color: #1565c0; }
+    .status-processing { background: #f3e5f5; color: #7b1fa2; }
+    .status-completed { background: #e8f5e9; color: #2e7d32; }
+
+    .btn-small {
+      padding: 4px 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background: white;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .btn-small:hover { background: #f5f5f5; }
+    .btn-primary {
+      background: #1F4E79;
+      color: white;
+      border-color: #1F4E79;
+    }
+    .btn-primary:hover { background: #2a6ba8; }
+
+    /* ===== 详情弹窗 ===== */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 1000;
+      overflow-y: auto;
+      padding: 40px 20px;
+    }
+    .modal-overlay.show { display: block; }
+    .modal-content {
+      background: white;
+      border-radius: 12px;
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 32px;
+      position: relative;
+    }
+    .modal-close {
+      position: absolute;
+      top: 16px;
+      right: 20px;
+      font-size: 24px;
+      cursor: pointer;
+      color: #999;
+      background: none;
+      border: none;
+    }
+    .modal-close:hover { color: #333; }
+    .modal-content h2 {
+      font-size: 20px;
+      color: #1F4E79;
+      margin-bottom: 20px;
+      padding-right: 40px;
+    }
+    .modal-content .info-block { margin-bottom: 20px; }
+    .modal-content .info-block h3 {
+      font-size: 14px;
+      color: #1F4E79;
+      margin-bottom: 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #eee;
+    }
+    .modal-content .info-grid-detail {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 6px 12px;
+      font-size: 13px;
+    }
+    .modal-content .info-grid-detail .key {
+      color: #888;
+      font-weight: 500;
+    }
+    .modal-content .info-grid-detail .val { color: #333; }
+
+    .status-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+      align-items: center;
+    }
+    .status-actions select {
+      padding: 6px 10px;
+      border: 1.5px solid #ddd;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #999;
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-state h3 { font-size: 16px; color: #666; margin-bottom: 8px; }
+    .empty-state p { font-size: 13px; }
+
+    @media (max-width: 768px) {
+      .stats-bar { grid-template-columns: repeat(2, 1fr); }
+      .table-wrap { padding: 0 12px 12px; }
+      .modal-content { padding: 20px; }
+      .modal-content .info-grid-detail { grid-template-columns: 1fr; }
+      .app-header { flex-direction: column; gap: 8px; text-align: center; }
+    }
+
+    .loading-spinner {
+      text-align: center;
+      padding: 60px;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===== 登录页面 ===== -->
+  <div class="login-page" id="loginPage">
+    <div class="login-card">
+      <h1>诊断系统管理后台</h1>
+      <p>登录后查看客户提交的自诊数据</p>
+      <form id="loginForm">
+        <div class="field-group">
+          <label>邮箱</label>
+          <input type="email" id="loginEmail" placeholder="admin@example.com" required>
+        </div>
+        <div class="field-group">
+          <label>密码</label>
+          <input type="password" id="loginPassword" placeholder="输入密码" required>
+        </div>
+        <button type="submit" class="btn-login" id="btnLogin">登录</button>
+        <div class="login-error" id="loginError">登录失败，请检查邮箱和密码</div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===== 管理后台 ===== -->
+  <div class="app-layout" id="appLayout">
+
+    <!-- 顶部导航 -->
+    <div class="app-header">
+      <h1>📋 客户自诊数据</h1>
+      <div class="user-info">
+        <span id="userEmail"></span>
+        <button class="btn-logout" id="btnLogout">退出登录</button>
+      </div>
+    </div>
+
+    <!-- 统计 -->
+    <div class="stats-bar" id="statsBar">
+      <div class="stat-card"><div class="num" id="statAll">0</div><div class="label">全部提交</div></div>
+      <div class="stat-card"><div class="num" id="statNew">0</div><div class="label">待处理</div></div>
+      <div class="stat-card"><div class="num" id="statProcessing">0</div><div class="label">处理中</div></div>
+      <div class="stat-card"><div class="num" id="statCompleted">0</div><div class="label">已完成</div></div>
+    </div>
+
+    <!-- 筛选 -->
+    <div class="toolbar">
+      <select id="filterStatus">
+        <option value="all">全部状态</option>
+        <option value="new">待处理</option>
+        <option value="read">已读</option>
+        <option value="processing">处理中</option>
+        <option value="completed">已完成</option>
+      </select>
+      <input type="text" id="searchInput" placeholder="搜索店铺名/客户名/手机号...">
+      <button class="btn-small" id="btnRefresh" style="margin-left:auto;">🔄 刷新</button>
+    </div>
+
+    <!-- 表格 -->
+    <div class="table-wrap" id="tableWrap">
+      <div class="loading-spinner" id="loadingState">加载中...</div>
+      <table id="dataTable" style="display:none;">
+        <thead>
+          <tr>
+            <th>提交时间</th>
+            <th>店铺名</th>
+            <th>客户</th>
+            <th>手机号</th>
+            <th>品类</th>
+            <th>自诊结果</th>
+            <th>状态</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+      <div class="empty-state" id="emptyState" style="display:none;">
+        <div class="icon">📭</div>
+        <h3>还没有客户提交数据</h3>
+        <p>将表单页面部署上线后，客户提交的数据会显示在这里</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 详情弹窗 ===== -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal-content" id="modalContent">
+      <button class="modal-close" id="modalClose">&times;</button>
+      <h2 id="modalTitle">客户详情</h2>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <script>
+    // ===== 配置 =====
+    const SUPABASE_URL = 'https://quncytlifkaqcgpmjmeh.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF1bmN5dGxpZmthcWNncG1qbWVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzNjgxMTYsImV4cCI6MjA5NDk0NDExNn0.xhGD9zWq5JwQA_KNhW9bbvo3Mg5cLlCHWTKLbInjZsc';
+    const ADMIN_PASSWORD = 'admin888'; // ← 管理员密码，可自行修改
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ===== 状态 =====
+    let allSubmissions = [];
+    let currentUser = null;
+
+    // ===== DOM 引用 =====
+    const loginPage = document.getElementById('loginPage');
+    const appLayout = document.getElementById('appLayout');
+    const loginForm = document.getElementById('loginForm');
+    const loginEmail = document.getElementById('loginEmail');
+    const loginPassword = document.getElementById('loginPassword');
+    const btnLogin = document.getElementById('btnLogin');
+    const loginError = document.getElementById('loginError');
+    const btnLogout = document.getElementById('btnLogout');
+    const userEmail = document.getElementById('userEmail');
+    const filterStatus = document.getElementById('filterStatus');
+    const searchInput = document.getElementById('searchInput');
+    const btnRefresh = document.getElementById('btnRefresh');
+    const tableBody = document.getElementById('tableBody');
+    const dataTable = document.getElementById('dataTable');
+    const emptyState = document.getElementById('emptyState');
+    const loadingState = document.getElementById('loadingState');
+    const modalOverlay = document.getElementById('modalOverlay');
+    const modalBody = document.getElementById('modalBody');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalClose = document.getElementById('modalClose');
+
+    // ===== 登录（简单密码） =====
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      loginError.style.display = 'none';
+
+      if (loginPassword.value === ADMIN_PASSWORD) {
+        sessionStorage.setItem('admin_logged_in', 'true');
+        showApp();
+      } else {
+        loginError.style.display = 'block';
+        loginError.textContent = '密码错误，请重试';
+      }
+    });
+
+    // ===== 退出 =====
+    btnLogout.addEventListener('click', () => {
+      sessionStorage.removeItem('admin_logged_in');
+      loginPage.style.display = 'flex';
+      appLayout.style.display = 'none';
+    });
+
+    // ===== 检查登录状态 =====
+    function checkSession() {
+      if (sessionStorage.getItem('admin_logged_in') === 'true') {
+        showApp();
+      }
+    }
+
+    // ===== 显示后台 =====
+    function showApp() {
+      loginPage.style.display = 'none';
+      appLayout.style.display = 'block';
+      userEmail.textContent = currentUser?.email || '';
+      loadData();
+    }
+
+    // ===== 加载数据 =====
+    async function loadData() {
+      loadingState.style.display = 'block';
+      dataTable.style.display = 'none';
+      emptyState.style.display = 'none';
+
+      try {
+        const { data, error } = await supabase
+          .from('submissions')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        allSubmissions = data || [];
+        render();
+      } catch (err) {
+        console.error('Load error:', err);
+        loadingState.textContent = '加载失败：' + (err.message || '未知错误');
+      }
+
+      loadingState.style.display = 'none';
+    }
+
+    // ===== 渲染 =====
+    function render() {
+      const statusFilter = filterStatus.value;
+      const searchQuery = searchInput.value.trim().toLowerCase();
+
+      // 筛选
+      let filtered = allSubmissions;
+      if (statusFilter !== 'all') {
+        filtered = filtered.filter(s => s.status === statusFilter);
+      }
+      if (searchQuery) {
+        filtered = filtered.filter(s =>
+          (s.store_name || '').toLowerCase().includes(searchQuery) ||
+          (s.owner_name || '').toLowerCase().includes(searchQuery) ||
+          (s.phone || '').includes(searchQuery)
+        );
+      }
+
+      // 更新统计
+      const counts = { all: allSubmissions.length, new: 0, processing: 0, completed: 0 };
+      allSubmissions.forEach(s => {
+        if (s.status === 'new' || !s.status) counts.new++;
+        else if (s.status === 'processing') counts.processing++;
+        else if (s.status === 'completed') counts.completed++;
+      });
+      document.getElementById('statAll').textContent = counts.all;
+      document.getElementById('statNew').textContent = counts.new;
+      document.getElementById('statProcessing').textContent = counts.processing;
+      document.getElementById('statCompleted').textContent = counts.completed;
+
+      // 渲染表格
+      if (filtered.length === 0) {
+        dataTable.style.display = 'none';
+        emptyState.style.display = 'block';
+        if (allSubmissions.length > 0) {
+          emptyState.querySelector('h3').textContent = '没有匹配的记录';
+          emptyState.querySelector('p').textContent = '尝试修改筛选条件或搜索关键词';
+        }
+        return;
+      }
+
+      dataTable.style.display = 'table';
+      emptyState.style.display = 'none';
+
+      tableBody.innerHTML = filtered.map(s => {
+        const statusClass = s.status === 'new' || !s.status ? 'status-new' :
+          s.status === 'read' ? 'status-read' :
+          s.status === 'processing' ? 'status-processing' : 'status-completed';
+        const statusLabel = s.status === 'new' || !s.status ? '待处理' :
+          s.status === 'read' ? '已读' :
+          s.status === 'processing' ? '处理中' : '已完成';
+        const time = s.created_at ? new Date(s.created_at).toLocaleString('zh-CN', {
+          month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+        }) : '-';
+        return `<tr>
+          <td style="white-space:nowrap;">${time}</td>
+          <td><strong>${esc(s.store_name)}</strong></td>
+          <td>${esc(s.owner_name)}</td>
+          <td>${esc(s.phone)}</td>
+          <td>${esc(s.category || '-')}</td>
+          <td style="max-width:120px;font-size:12px;">${esc(s.self_diagnosis || '-')}</td>
+          <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
+          <td><button class="btn-small btn-primary" onclick="viewDetail('${s.id}')">查看详情</button></td>
+        </tr>`;
+      }).join('');
+    }
+
+    // ===== 查看详情 =====
+    window.viewDetail = async function(id) {
+      const s = allSubmissions.find(x => x.id === id);
+      if (!s) return;
+
+      // 自动标记为已读
+      if (!s.status || s.status === 'new') {
+        await supabase.from('submissions').update({ status: 'read' }).eq('id', id);
+        s.status = 'read';
+        render();
+      }
+
+      modalTitle.textContent = `${s.store_name} · 详细数据`;
+      modalBody.innerHTML = buildDetailHtml(s);
+      modalOverlay.classList.add('show');
+    };
+
+    function buildDetailHtml(s) {
+      const dimQuestions = [
+        { title: '客流分析（维度一）', items: [
+          { k: '每天进店人数', v: s.q1_flow_people },
+          { k: '客流不足原因', v: s.q2_flow_reason },
+          { k: '门前客流统计', v: s.q3_flow_tracking }
+        ]},
+        { title: '成交分析（维度二）', items: [
+          { k: '成交率', v: s.q4_conversion_rate },
+          { k: '未成交原因', v: s.q5_loss_reason },
+          { k: '停留时长关注', v: s.q6_stay_time }
+        ]},
+        { title: '利润分析（维度三）', items: [
+          { k: '利润核算', v: s.q7_profit_clarity },
+          { k: '成本了解', v: s.q8_cost_awareness },
+          { k: '产品利润率', v: s.q9_product_margin }
+        ]},
+        { title: '推广分析（维度四）', items: [
+          { k: '月推广投入', v: s.q10_marketing_budget },
+          { k: '效果判断', v: s.q11_marketing_effect },
+          { k: '推广渠道', v: s.q12_marketing_channels }
+        ]},
+        { title: '复购分析（维度五）', items: [
+          { k: '回头客比例', v: s.q13_return_rate },
+          { k: '维护方式', v: s.q14_retention_method },
+          { k: '流失原因', v: s.q15_churn_reason }
+        ]},
+        { title: '管理分析（维度六）', items: [
+          { k: '老板在店时长', v: s.q16_owner_hours },
+          { k: '离店运转情况', v: s.q17_operation_without_owner },
+          { k: 'SOP标准化', v: s.q18_sop_status }
+        ]}
+      ];
+
+      let html = '';
+
+      // 基本信息
+      html += '<div class="info-block"><h3>📋 基本信息</h3><div class="info-grid-detail">';
+      const basics = [
+        ['店铺名称', s.store_name],
+        ['老板姓名', s.owner_name],
+        ['手机号', s.phone],
+        ['品类', s.category],
+        ['开业时长', s.open_time],
+        ['员工人数', s.employees],
+        ['月营业额', s.monthly_revenue],
+        ['月租金', s.rent],
+        ['店铺位置', s.location],
+        ['经营面积', s.area || '-'],
+        ['提交时间', s.created_at ? new Date(s.created_at).toLocaleString('zh-CN') : '-'],
+      ];
+      basics.forEach(([k, v]) => {
+        html += `<span class="key">${k}</span><span class="val">${esc(v || '-')}</span>`;
+      });
+      html += '</div></div>';
+
+      // 6维度
+      dimQuestions.forEach(dim => {
+        html += `<div class="info-block"><h3>${dim.title}</h3><div class="info-grid-detail">`;
+        dim.items.forEach(item => {
+          if (item.v) {
+            html += `<span class="key">${item.k}</span><span class="val">${esc(item.v)}</span>`;
+          }
+        });
+        html += '</div></div>';
+      });
+
+      // 补充信息
+      html += '<div class="info-block"><h3>✏️ 补充信息</h3><div class="info-grid-detail">';
+      html += `<span class="key">最大问题</span><span class="val">${esc(s.main_problem || '-')}</span>`;
+      html += `<span class="key">期望月增收</span><span class="val">${esc(s.expected_gain || '-')}</span>`;
+      html += `<span class="key">自诊结果</span><span class="val">${esc(s.self_diagnosis || '-')}</span>`;
+      html += `<span class="key">补充备注</span><span class="val">${esc(s.notes || '-')}</span>`;
+      html += '</div></div>';
+
+      // 状态操作
+      html += '<div class="status-actions">';
+      html += `<span style="font-weight:500;font-size:13px;">当前状态：</span>`;
+      const statuses = [
+        ['new', '待处理'],
+        ['read', '已读'],
+        ['processing', '处理中'],
+        ['completed', '已完成']
+      ];
+      html += `<select onchange="updateStatus('${s.id}', this.value)">`;
+      statuses.forEach(([val, label]) => {
+        const sel = (s.status || 'new') === val ? 'selected' : '';
+        html += `<option value="${val}" ${sel}>${label}</option>`;
+      });
+      html += '</select>';
+      html += '</div>';
+
+      return html;
+    }
+
+    // ===== 更新状态 =====
+    window.updateStatus = async function(id, status) {
+      try {
+        await supabase.from('submissions').update({ status }).eq('id', id);
+        const s = allSubmissions.find(x => x.id === id);
+        if (s) s.status = status;
+        render();
+      } catch (err) {
+        alert('更新失败：' + err.message);
+      }
+    };
+
+    // ===== 工具函数 =====
+    function esc(str) {
+      if (!str) return '';
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // ===== 事件绑定 =====
+    filterStatus.addEventListener('change', render);
+    searchInput.addEventListener('input', render);
+    btnRefresh.addEventListener('click', loadData);
+    modalClose.addEventListener('click', () => modalOverlay.classList.remove('show'));
+    modalOverlay.addEventListener('click', (e) => {
+      if (e.target === modalOverlay) modalOverlay.classList.remove('show');
+    });
+
+    // ===== 启动 =====
+    checkSession();
+  </script>
+</body>
+</html>
