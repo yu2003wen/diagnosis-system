@@ -167,7 +167,7 @@ function updateSelInfo() {
   document.getElementById('selInfo').textContent = cnt > 0 ? '已选 ' + cnt + ' 条' : '未选择';
 }
 
-// ===== 导出选中 =====
+// ===== 导出完整数据 =====
 document.getElementById('exportBtn').onclick = function() {
   var list = getFilteredList();
   if (Object.keys(selIds).length > 0) {
@@ -175,21 +175,52 @@ document.getElementById('exportBtn').onclick = function() {
   }
   if (list.length === 0) { alert('没有可导出的数据，请先勾选'); return; }
 
+  // 基础字段
   var keys = ['store_name','owner_name','phone','category','form_version','created_at','status'];
   var labels = ['店铺名称','老板姓名','手机号','品类','表单版本','提交时间','状态'];
+
+  // form_data 字段
+  var fdKeys = ['shopName','contact','location','industry_type','industry_subtype','monthly_revenue','rent','employees','stage','trend_30d'];
+  var fdLabels = ['店铺名(新)','联系方式','所在区域','行业大类','细分类型','月营业额','月租金','员工','经营阶段','近30天趋势'];
+  var coreLabels = ['主要客源渠道','门店识别度','产品结构','成交障碍','盈亏平衡点','老板实际利润','渠道统计','推广动作','客户沉淀','复购机制','每日数据记录','老板依赖度'];
+  var needLabels = ['优先解决问题','后续需求','期望利润提升'];
+  keys = keys.concat(fdKeys).concat(coreLabels).concat(needLabels);
+  labels = labels.concat(fdLabels).concat(coreLabels).concat(needLabels);
+
+  // 找出所有行业专属题（合并所有记录中的字段）
+  var extraHeaders = {};
+  list.forEach(function(d) {
+    if (d.form_data && d.form_data.special_answers) {
+      for (var k in d.form_data.special_answers) { extraHeaders[k] = true; }
+    }
+  });
+  var extraKeys = Object.keys(extraHeaders);
+  if (extraKeys.length) { keys = keys.concat(extraKeys); labels = labels.concat(extraKeys); }
+
+  // 取值的辅助函数
+  function getVal(d, k) {
+    if (d.form_data) {
+      if (d.form_data[k] !== undefined) return d.form_data[k];
+      if (d.form_data.core_answers && d.form_data.core_answers[k] !== undefined) return d.form_data.core_answers[k];
+      if (d.form_data.special_answers && d.form_data.special_answers[k] !== undefined) return d.form_data.special_answers[k];
+    }
+    return d[k];
+  }
+
   var rows = list.map(function(d) {
     return keys.map(function(k) {
-      var v = d[k] || '';
-      var s = String(v).replace(/"/g,'""');
-      return '"' + s + '"';
+      var v = getVal(d, k);
+      v = (v === undefined || v === null) ? '' : (Array.isArray(v) ? v.join('、') : v);
+      return '"' + String(v).replace(/"/g,'""') + '"';
     }).join(',');
   });
+
   var csv = labels.map(function(l) { return '"' + l + '"'; }).join(',') + '\n' + rows.join('\n');
   var blob = new Blob(['﻿' + csv], {type:'text/csv;charset=utf-8;'});
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   var now = new Date();
-  a.download = '诊断数据_导出_' + now.getFullYear() + '-' + (now.getMonth()+1) + '-' + now.getDate() + '.csv';
+  a.download = '诊断数据_全部_' + now.getFullYear() + '-' + (now.getMonth()+1) + '-' + now.getDate() + '.csv';
   a.click();
 };
 
@@ -358,14 +389,19 @@ async function view(id) {
   }
 
   html += '</div>';
-  html += '<div style="margin-top:16px"><span style="font-size:13px;font-weight:500">状态：</span>' +
+  html += '<div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">';
+  html += '<span style="font-size:13px;font-weight:500;line-height:28px">状态：</span>' +
     '<select onchange="upd(\''+d.id+'\',this.value)" style="padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px">' +
     '<option value="new"'+(d.status==='new'||!d.status?' selected':'')+'>待处理</option>' +
     '<option value="read"'+(d.status==='read'?' selected':'')+'>已读</option>' +
     '<option value="processing"'+(d.status==='processing'?' selected':'')+'>处理中</option>' +
     '<option value="completed"'+(d.status==='completed'?' selected':'')+'>已完成</option>' +
-    '</select></div>';
-  html += '<button class="sbtn sbtn-d" onclick="if(confirm(\'确认删除？\')){delOne(\''+d.id+'\',\''+esc(d.store_name||'')+'\')}" style="margin-top:12px">🗑 删除此条数据</button>';
+    '</select>';
+  if (d.form_version === 'v2' && d.form_data) {
+    html += '<button class="sbtn sbtn-p" onclick="generateReport(\''+d.id+'\')" style="background:#E65100;border-color:#E65100">📄 生成诊断报告</button>';
+  }
+  html += '<button class="sbtn sbtn-d" onclick="if(confirm(\'确认删除？\')){delOne(\''+d.id+'\',\''+esc(d.store_name||'')+'\')}" style="margin-left:auto">🗑 删除</button>';
+  html += '</div>';
   document.getElementById('modalBody').innerHTML = html;
   document.getElementById('modal').classList.add('show');
 }
@@ -381,6 +417,235 @@ async function upd(id, status) {
     if (d) d.status = status;
     render();
   } catch(e) { alert('更新失败'); }
+}
+
+// ===== 生成诊断报告 =====
+function generateReport(id) {
+  var d = all.find(function(x) { return x.id === id; });
+  if (!d || !d.form_data) return;
+  var fd = d.form_data;
+  var fd2 = fd.core_answers || {};
+  var sp = fd.special_answers || {};
+  var now = new Date();
+
+  function va(k) { var v = fd2[k]; return (v === undefined || v === null) ? '' : (Array.isArray(v) ? v.join('、') : v); }
+  function vp(k) { var v = fd[k]; return (v === undefined || v === null) ? '' : v; }
+  function has(k) { var v = va(k); return v !== '' && v !== '未填写'; }
+
+  // ===== 分析引擎 =====
+  // 风险评分：每个维度0-10（越高越严重）
+  function calcScore() {
+    var scores = {};
+    // 客流风险：主要客源渠道是否单一 + 门店识别度
+    var src = va('主要客源渠道');
+    var srcArr = src ? src.split('、') : [];
+    scores.客流 = (srcArr.length <= 2 ? 7 : srcArr.length <= 3 ? 4 : 2) + (va('门店识别度').includes('不够明显') ? 3 : va('门店识别度').includes('看不懂') ? 5 : 0);
+
+    // 成交风险
+    scores.成交 = (has('成交障碍') ? Math.min(va('成交障碍').split('、').length * 2, 8) : 3) + (va('产品结构').includes('不清楚') ? 4 : va('产品结构').includes('大概') ? 2 : 0);
+
+    // 利润风险
+    scores.利润 = (va('盈亏平衡点').includes('不清楚') || va('盈亏平衡点').includes('没算过') ? 5 : va('盈亏平衡点').includes('大概') ? 3 : 1) * 1.5;
+    if (va('老板实际利润').includes('亏损')) scores.利润 += 4;
+    else if (va('老板实际利润').includes('打平')) scores.利润 += 2;
+
+    // 推广风险
+    scores.推广 = (va('渠道统计').includes('完全不知道') ? 5 : va('渠道统计').includes('凭感觉') ? 4 : va('渠道统计').includes('大概') ? 2 : 0) + (va('推广动作').includes('基本没做') ? 4 : 0);
+
+    // 复购风险
+    scores.复购 = (va('客户沉淀').includes('没有沉淀') || va('客户沉淀').includes('50人以下') ? 5 : va('客户沉淀').includes('说不清') ? 4 : va('客户沉淀').includes('50-200') ? 2 : 0) + (va('复购机制').includes('没有固定动作') ? 4 : 0);
+
+    // 管理风险
+    scores.管理 = (va('老板依赖度').includes('完全靠老板') ? 5 : va('老板依赖度').includes('不行') ? 4 : va('老板依赖度').includes('勉强') ? 2 : 0) + (va('每日数据记录').includes('没有记录') ? 4 : 0);
+
+    // 归一化到0-10
+    for (var k in scores) { scores[k] = Math.min(Math.round(scores[k]), 10); }
+    return scores;
+  }
+
+  var scores = calcScore();
+  var maxDim = ''; var maxScore = 0;
+  for (var k in scores) { if (scores[k] > maxScore) { maxScore = scores[k]; maxDim = k; } }
+  var sortedDims = Object.keys(scores).sort(function(a,b) { return scores[b] - scores[a]; });
+
+  // ===== 各维度分析文本 =====
+  function dimAnalysis(dim) {
+    var texts = {
+      '客流': {
+        analysis: '客源结构'+(srcArr && srcArr.length <= 2 ? '较为单一，主要依赖少数渠道，抗风险能力较弱' : '相对多元，有一定抗风险能力')+'。门店识别度方面，'+(va('门店识别度')||'暂无数据')+'。',
+        suggest: ['建议统计7天门前客流数据，摸清真实进店基数','优化门头设计，确保30米外能看清主营业务','拓展2-3个新获客渠道，降低单一渠道依赖']
+      },
+      '成交': {
+        analysis: (has('成交障碍') ? '存在「'+va('成交障碍')+'」等成交障碍。' : '成交转化方面有待提升。')+(va('产品结构').includes('不清楚') ? '产品结构不够清晰，缺乏引流款和利润款的系统设计。' : va('产品结构').includes('大概') ? '产品结构有初步概念，但可以进一步系统化。' : '产品结构设计较为清晰。'),
+        suggest: ['梳理产品矩阵：明确引流款、利润款、复购款','培训员工推荐话术，提升连带销售能力','记录客户不进店/不成交的原因，针对性优化']
+      },
+      '利润': {
+        analysis: (va('盈亏平衡点').includes('不清楚')||va('盈亏平衡点').includes('没算过')?'没有计算过盈亏平衡点，这是经营中最基础也最重要的数据。':'对盈亏平衡点有一定认知。')+(va('老板实际利润').includes('亏损')?'当前处于亏损状态，需要紧急调整。':va('老板实际利润').includes('打平')?'当前仅能保本，没有利润积累。':'有一定利润空间。'),
+        suggest: ['立刻计算盈亏平衡点，明确每月保本营业额','梳理各项成本占比，找出可优化的空间','盘点各产品/服务的毛利率，聚焦高利润产品']
+      },
+      '推广': {
+        analysis: (va('渠道统计').includes('完全不知道')?'推广效果没有追踪，投入产出比完全不清晰。':va('渠道统计').includes('凭感觉')?'推广效果主要凭感觉判断，缺乏数据支撑。':'有初步的渠道效果追踪。')+(va('推广动作').includes('基本没做')?'目前几乎没有主动推广动作。':''),
+        suggest: ['建立推广效果台账，记录每个渠道的投入和产出','先聚焦1-2个效果最好的渠道打透','在小红书/抖音/美团中选择适合的平台深耕']
+      },
+      '复购': {
+        analysis: (va('客户沉淀').includes('没有沉淀')?'客户资产积累不足，没有可反复触达的客户池。':va('客户沉淀').includes('50人以下')?'客户池较小，需要加大新客获取和老客沉淀。':'有一定客户基础。')+(va('复购机制').includes('没有固定动作')?'缺乏系统化的复购机制设计。':'有初步的复购机制。'),
+        suggest: ['建立客户微信池，对老客户进行分类管理','设计会员/储值/次卡等复购工具','建立老带新激励体系，让老客户帮你介绍']
+      },
+      '管理': {
+        analysis: (va('老板依赖度').includes('完全靠老板')?'门店高度依赖老板个人，离开一天就可能出问题。':va('老板依赖度').includes('不行')?'老板缺位时门店运营会明显下滑。':'有一定管理基础。')+(va('每日数据记录').includes('没有记录')?'没有日常经营数据的记录习惯，决策缺乏依据。':''),
+        suggest: ['建立每日经营数据记录习惯（营业额、客单、单数等）','梳理各岗位操作流程，形成简单的SOP','培养骨干员工，逐步降低对老板个人的依赖']
+      }
+    };
+    return texts[dim] || {analysis:'需结合更多数据进一步分析。', suggest:['建议到店实地诊断，获取更全面的经营数据']};
+  }
+
+  // ===== 行业专有分析 =====
+  function industryNote() {
+    var notes = [];
+    for (var k in sp) {
+      var v = sp[k];
+      if (k === '堂食/外卖结构') { if (v.includes('外卖')) notes.push('外卖占比较高，需重点关注平台扣点和外卖包装成本'); }
+      if (k === '食材损耗') { if (v.includes('偏大')||v.includes('没统计')) notes.push('食材损耗需要统计和控制，直接影响利润率'); }
+      if (k === '试穿率' || k === '试听转化') { if (v.includes('不到')) notes.push('进店转化率偏低，需优化接待流程和话术'); }
+      if (k === '库存周转') { if (v.includes('压力')||v.includes('滞销')) notes.push('库存压力较大，建议做一次全面盘点并规划促销清仓'); }
+      if (k === '新客转化') { if (v.includes('不到')) notes.push('新客转化率偏低，需优化体验价后的追销流程'); }
+      if (k === '续费率') { if (v.includes('不到')) notes.push('续费率偏低，需关注客户满意度和服务价值感'); }
+    }
+    return notes.length ? notes : ['行业数据已记录，需结合行业经验进一步分析'];
+  }
+
+  var indNotes = industryNote();
+
+  // ===== 政策红利 =====
+  function policyTips() {
+    var loc = fd.location || '';
+    var tips = [];
+    if (loc.includes('江西') || loc.includes('南昌')) {
+      tips.push('江西省：餐饮贷款贴息（最高100万，年贴息1%）、餐饮+文旅联动消费券');
+      tips.push('南昌市：提振消费行动方案电子消费券、夜间经济街区扶持、商贸业高质量发展政策（至2027年底）');
+    }
+    tips.push('国家层面：小规模纳税人月销售额10万以下免征增值税（至2027年底）、个体工商户个税减半（年应纳税所得额200万元以下部分）');
+    tips.push('注意：以上政策以当地税务机关最新公告为准');
+    return tips;
+  }
+
+  // ===== 构建报告HTML =====
+  var shop = esc(fd.shopName || d.store_name || '未命名店铺');
+  var loc = esc(fd.location || '未填写');
+  var dateStr = now.getFullYear()+'年'+(now.getMonth()+1)+'月'+now.getDate()+'日';
+
+  var rpt = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>经营诊断报告 - '+shop+'</title>';
+  rpt += '<style>';
+  rpt += 'body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:#333;max-width:800px;margin:0 auto;padding:40px 30px;line-height:1.8}';
+  rpt += 'h1{font-size:24px;color:#1F4E79;text-align:center;margin-bottom:4px;padding-bottom:16px;border-bottom:3px solid #1F4E79}';
+  rpt += '.sub{text-align:center;color:#888;font-size:13px;margin-bottom:30px}';
+  rpt += 'h2{font-size:18px;color:#1F4E79;margin-top:28px;margin-bottom:12px;padding-left:10px;border-left:4px solid #1F4E79}';
+  rpt += 'h3{font-size:15px;color:#555;margin-top:16px;margin-bottom:8px}';
+  rpt += 'table{width:100%;border-collapse:collapse;margin:10px 0 16px}';
+  rpt += 'th,td{padding:8px 10px;border:1px solid #e0e0e0;text-align:left;font-size:13px}';
+  rpt += 'th{background:#f0f4f8;color:#1F4E79;font-weight:600}';
+  rpt += '.score{display:inline-block;padding:2px 10px;border-radius:4px;font-weight:600;font-size:13px}';
+  rpt += '.h{background:#e8f5e9;color:#2e7d32}';
+  rpt += '.m{background:#fff8e1;color:#f57f17}';
+  rpt += '.l{background:#ffebee;color:#c62828}';
+  rpt += 'ul{padding-left:20px;margin:6px 0}';
+  rpt += 'li{font-size:13px;margin:4px 0}';
+  rpt += '.info-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:10px 0}';
+  rpt += '.info-item{font-size:13px;padding:6px 10px;background:#f8f9fb;border-radius:4px}';
+  rpt += '.info-item .label{color:#888}';
+  rpt += '.warn-box{background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:12px 16px;margin:12px 0;font-size:13px}';
+  rpt += '.green-box{background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:12px 16px;margin:12px 0;font-size:13px}';
+  rpt += '.cta{background:#1F4E79;color:#fff;border-radius:8px;padding:16px 20px;margin:24px 0;text-align:center}';
+  rpt += '.cta a{color:#FFD54F;font-weight:600;text-decoration:none}';
+  rpt += '.page-break{page-break-before:always}';
+  rpt += '@media print{body{padding:20px}}';
+  rpt += '</style></head><body>';
+
+  // 封面
+  rpt += '<h1>实体店经营诊断报告</h1>';
+  rpt += '<div class="sub">基于经营体检数据生成 · '+dateStr+' · 仅供经营参考</div>';
+
+  // 基本信息摘要
+  rpt += '<h2>一、基本信息</h2>';
+  rpt += '<div class="info-grid">';
+  var basics = [['店铺名称',shop],['所在区域',loc],['行业',esc((fd.industry_type||'')+(fd.industry_subtype?' / '+fd.industry_subtype:''))],['月营业额',esc(fd.monthly_revenue||'')],['月租金',esc(fd.rent||'')],['员工人数',esc(fd.employees||'')],['经营阶段',esc(fd.stage||'')],['近30天趋势',esc(fd.trend_30d||'')]];
+  basics.forEach(function(b) { if (b[1]) rpt += '<div class="info-item"><span class="label">'+b[0]+'：</span>'+b[1]+'</div>'; });
+  rpt += '</div>';
+
+  // 经营健康度评分
+  rpt += '<h2>二、经营健康度评分</h2>';
+  rpt += '<p style="font-size:13px;color:#666">评分越高说明问题越严重（0-10分），建议优先处理分数最高的维度。</p>';
+  rpt += '<table><tr><th>维度</th><th>评分</th><th>健康度</th></tr>';
+  var dimLabels = {'客流':'🚶 客流','成交':'💰 成交','利润':'📊 利润','推广':'📢 推广','复购':'🔄 复购','管理':'👥 管理'};
+  sortedDims.forEach(function(dim) {
+    var s = scores[dim];
+    var cls = s <= 3 ? 'h' : s <= 6 ? 'm' : 'l';
+    var label = s <= 3 ? '良好' : s <= 6 ? '需关注' : '需改善';
+    rpt += '<tr><td>'+(dimLabels[dim]||dim)+'</td><td><span class="score '+cls+'">'+s+' / 10</span></td><td>'+label+'</td></tr>';
+  });
+  rpt += '</table>';
+
+  // 核心问题定位
+  rpt += '<h2>三、核心问题定位</h2>';
+  rpt += '<div class="warn-box">';
+  rpt += '<strong>最需优先解决的维度：'+sortedDims[0]+'（评分 '+scores[sortedDims[0]]+'/10）</strong><br>';
+  rpt += '分析：'+dimAnalysis(sortedDims[0]).analysis;
+  if (sortedDims.length > 1) {
+    rpt += '<br><br><strong>次优先维度：'+sortedDims[1]+'（评分 '+scores[sortedDims[1]]+'/10）</strong><br>';
+    rpt += '分析：'+dimAnalysis(sortedDims[1]).analysis;
+  }
+  rpt += '</div>';
+
+  // 各维度详细分析
+  rpt += '<h2>四、各维度详细分析</h2>';
+  sortedDims.forEach(function(dim) {
+    var da = dimAnalysis(dim);
+    rpt += '<h3>🚩 '+dim+'（评分 '+scores[dim]+'/10）</h3>';
+    rpt += '<p style="font-size:13px">'+da.analysis+'</p>';
+    rpt += '<ul>'+da.suggest.map(function(s) { return '<li>'+esc(s)+'</li>'; }).join('')+'</ul>';
+  });
+
+  // 行业专项
+  rpt += '<h2>五、行业专项分析</h2>';
+  rpt += '<ul>'+indNotes.map(function(n) { return '<li>'+esc(n)+'</li>'; }).join('')+'</ul>';
+  var spKeys = Object.keys(sp);
+  if (spKeys.length) {
+    rpt += '<table><tr><th>行业问题</th><th>客户反馈</th></tr>';
+    spKeys.forEach(function(k) { rpt += '<tr><td>'+esc(k)+'</td><td>'+esc(sp[k])+'</td></tr>'; });
+    rpt += '</table>';
+  }
+
+  // 需求与预期
+  var priorities = fd.priorities;
+  rpt += '<h2>六、客户需求与期望</h2>';
+  rpt += '<p style="font-size:13px">';
+  if (priorities && priorities.length) rpt += '优先解决问题：'+esc(Array.isArray(priorities)?priorities.join('、'):priorities)+'<br>';
+  if (fd.followup_need) rpt += '后续需求：'+esc(fd.followup_need)+'<br>';
+  if (fd.profit_expectation) rpt += '期望利润提升：'+esc(fd.profit_expectation);
+  rpt += '</p>';
+
+  // 政策红利
+  rpt += '<h2>七、政策红利提示</h2>';
+  var policies = policyTips();
+  rpt += '<ul>'+policies.map(function(p) { return '<li>'+esc(p)+'</li>'; }).join('')+'</ul>';
+
+  // CTA
+  rpt += '<div class="cta">';
+  rpt += '<strong style="font-size:16px">需要更深入的经营诊断？</strong><br><br>';
+  rpt += '线上分析只能基于填写信息做初步判断。<br>';
+  rpt += '建议安排到店实地诊断，结合后台数据、现场观察、员工访谈，出具完整书面报告。<br><br>';
+  rpt += '📞 联系顾问安排到店诊断';
+  rpt += '</div>';
+
+  rpt += '<p style="text-align:center;color:#999;font-size:12px;margin-top:40px">报告生成日期：'+dateStr+' · 本报告基于客户自填信息生成，仅供参考</p>';
+  rpt += '</body></html>';
+
+  // 在新窗口打开报告
+  var w = window.open('', '_blank');
+  if (!w) { alert('请允许弹出窗口'); return; }
+  w.document.write(rpt);
+  w.document.close();
+  w.focus();
 }
 </script>
 </body>
