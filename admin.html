@@ -75,6 +75,7 @@ tr:hover td{background:#f8faff}
         <option value="completed">已完成</option>
       </select>
       <button class="sbtn" id="refreshBtn" style="margin-left:8px">刷新</button>
+      <button class="sbtn" id="exportBtn" style="margin-left:8px;background:#1F7A4D;color:#fff;border-color:#1F7A4D">📥 导出CSV</button>
     </div>
     <div class="loading" id="loading">加载中...</div>
     <div class="empty" id="empty" style="display:none"><h3>暂无数据</h3></div>
@@ -129,8 +130,40 @@ if (sessionStorage.getItem('ok') === '1') {
 
 document.getElementById('filter').onchange = render;
 document.getElementById('refreshBtn').onclick = load;
+document.getElementById('exportBtn').onclick = exportCSV;
 document.getElementById('modalClose').onclick = function() { document.getElementById('modal').classList.remove('show'); };
 document.getElementById('modal').onclick = function(e) { if (e.target === this) this.classList.remove('show'); };
+
+// ===== 导出CSV =====
+function exportCSV() {
+  if (all.length === 0) { alert('没有数据可导出'); return; }
+  var keys = ['store_name','owner_name','phone','category','open_time','employees','monthly_revenue','rent','location','area',
+    'q1_flow_people','q2_flow_reason','q3_flow_tracking','q4_conversion_rate','q5_loss_reason','q6_stay_time',
+    'q7_profit_clarity','q8_cost_awareness','q9_product_margin','q10_marketing_budget','q11_marketing_effect','q12_marketing_channels',
+    'q13_return_rate','q14_retention_method','q15_churn_reason','q16_owner_hours','q17_operation_without_owner','q18_sop_status',
+    'main_problem','expected_gain','self_diagnosis','notes','status','created_at'];
+  var labels = ['店铺名称','老板姓名','手机号','品类','开业时长','员工人数','月营业额','月租金','店铺位置','经营面积',
+    '每天进店人数','客流不足原因','门前客流统计','成交率','未成交原因','停留时长关注',
+    '利润核算','成本了解','产品利润率','月推广投入','效果判断','推广渠道',
+    '回头客比例','维护方式','流失原因','老板在店时长','离店运转情况','SOP标准化',
+    '最大问题','期望月增收','自诊结果','备注','状态','提交时间'];
+  var rows = all.map(function(d) {
+    var arr = keys.map(function(k) {
+      var v = d[k] || '';
+      var s = String(v).replace(/"/g,'""');
+      return '"' + s + '"';
+    });
+    return arr.join(',');
+  });
+  var csv = labels.map(function(l) { return '"' + l + '"'; }).join(',') + '\n' + rows.join('\n');
+  var blob = new Blob(['﻿' + csv], {type: 'text/csv;charset=utf-8;'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  var now = new Date();
+  a.download = '诊断数据_导出_' + now.getFullYear() + '-' + (now.getMonth()+1) + '-' + now.getDate() + '.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 
 // ===== 加载数据 =====
 async function load() {
