@@ -43,7 +43,7 @@ h1{font-size:24px;line-height:1.3;color:var(--blue);font-weight:800}
 
   <div class="progress"><div class="bar"><span id="bar"></span></div><div class="progress-text" id="progressText">已填写 0%</div></div>
 
-  <div class="notice">说明：本页面是经营体检入口，不是普通问卷。系统会根据行业类型、经营阶段和6大维度答案生成可复制的自诊摘要。</div>
+  <div class="notice">说明：本页面是经营体检入口。系统会根据你的答案生成自诊摘要，同时数据会自动提交给顾问，无需手动复制。</div>
 
   <form id="form" onsubmit="return false;">
     <section class="card">
@@ -404,18 +404,25 @@ document.addEventListener('input',updateProgress);
 function getVal(k){let v=answers[k];return Array.isArray(v)?v.join('、'):(v||'未填写')}
 function inferTags(){let tags=[],risk=[]; if(['有流水，但利润不清楚','准备转让/止损','老店下滑，想重新调整'].includes(answers['经营阶段']))risk.push('经营阶段需重点复盘'); if(['不清楚','从没算过'].includes(answers['盈亏平衡点']))risk.push('利润底线不清'); if(['完全不知道','只能凭感觉'].includes(answers['渠道统计']))risk.push('推广效果难判断'); if(['没有沉淀','50人以下','说不清'].includes(answers['客户沉淀']))risk.push('客户资产薄弱'); if((answers['每日数据记录']||[]).includes('没有记录'))risk.push('数据记录缺失'); if(['基本完全靠老板自己','不行，会明显混乱'].includes(answers['老板依赖度']))risk.push('老板依赖度高'); if(answers['产品结构']==='很清楚，并且有对应产品')tags.push('产品结构较清晰'); if(answers['渠道统计']==='能，每个渠道都有记录')tags.push('渠道统计较好'); if(answers['客户沉淀']==='500人以上'||answers['客户沉淀']==='200–500人')tags.push('具备客户资产基础'); return {tags,risk};}
 function submitForm(){
-  // 生成摘要
-  const r=inferTags();let lines=[];lines.push('【实体店经营体检摘要】');lines.push('');lines.push('一、基础信息');lines.push('店铺名称：'+(document.getElementById('shopName').value.trim()||'未填写'));lines.push('城市区域：'+(currentLocationText()||'未填写'));lines.push('行业类型：'+getVal('行业大类')+' / '+getVal('细分类型'));lines.push('月营业额：'+getVal('月营业额'));lines.push('月租金：'+getVal('月租金'));lines.push('员工人数：'+getVal('员工人数'));lines.push('');lines.push('二、经营阶段');lines.push('当前阶段：'+getVal('经营阶段'));lines.push('近30天趋势：'+getVal('近30天趋势'));lines.push('');lines.push('三、六大维度关键答案');CORE.forEach(q=>lines.push(q.dim+'｜'+q.field+'：'+getVal(q.field)));lines.push('');lines.push('四、行业专属答案');(SPECIAL[currentIndustry]||SPECIAL['其他实体店']).forEach(x=>lines.push(x[0]+'：'+getVal(x[0])));lines.push('');lines.push('五、优先问题与需求');lines.push('优先解决问题：'+getVal('优先解决问题'));lines.push('后续需求：'+getVal('后续需求'));lines.push('期望利润提升：'+getVal('期望利润提升'));lines.push('联系方式：'+(document.getElementById('contact').value.trim()||'未填写'));lines.push('');lines.push('六、初步风险标签');lines.push((r.risk.length?r.risk:['暂无明显高风险标签，需结合数据复核']).join('、'));
-  resultContent.textContent=lines.join('\n'); tags.innerHTML=[...r.tags.map(t=>'<span class="tag good">'+t+'</span>'),...r.risk.map(t=>'<span class="tag risk">'+t+'</span>')].join('')||'<span class="tag">待进一步分析</span>'; modal.classList.add('show');
+  // 禁用按钮，显示加载
+  var btn = document.querySelector('.submit-btn');
+  var btnText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '提交保存中…';
 
-  // 同时将所有数据提交到数据库
+  // 收集所有数据
+  var shopName = document.getElementById('shopName').value.trim();
+  var contact = document.getElementById('contact').value.trim();
+
   var payload = {
-    store_name: document.getElementById('shopName').value.trim() || '未填写',
-    phone: document.getElementById('contact').value.trim() || '',
+    store_name: shopName || '未填写',
+    owner_name: '',
+    phone: contact || '',
+    category: answers['行业大类'] || '',
     form_version: 'v2',
     form_data: {
-      shopName: document.getElementById('shopName').value.trim(),
-      contact: document.getElementById('contact').value.trim(),
+      shopName: shopName,
+      contact: contact,
       location: currentLocationText(),
       industry_type: answers['行业大类'] || '',
       industry_subtype: answers['细分类型'] || '',
@@ -428,16 +435,52 @@ function submitForm(){
       special_answers: {},
       priorities: answers['优先解决问题'] || [],
       followup_need: answers['后续需求'] || '',
-      profit_expectation: answers['期望利润提升'] || '',
-      tags: {good: r.tags, risk: r.risk}
+      profit_expectation: answers['期望利润提升'] || ''
     }
   };
   CORE.forEach(function(q) { payload.form_data.core_answers[q.field] = answers[q.field] || ''; });
   (SPECIAL[currentIndustry]||SPECIAL['其他实体店']).forEach(function(x) { payload.form_data.special_answers[x[0]] = answers[x[0]] || ''; });
 
-  fetch(SU + '/rest/v1/submissions', {method:'POST', headers: HD, body: JSON.stringify([payload])}).catch(function(err) {
-    console.error('提交数据失败:', err);
-  });
+  // 先提交到数据库，再显示摘要
+  fetch(SU + '/rest/v1/submissions', {method:'POST', headers: HD, body: JSON.stringify([payload])})
+    .then(function(r) {
+      if (!r.ok) throw new Error('保存失败('+r.status+')');
+      // 保存成功 → 生成并显示摘要
+      const r2 = inferTags();
+      var lines = [];
+      lines.push('【实体店经营体检摘要】');
+      lines.push('');lines.push('✅ 数据已自动提交给顾问');
+      lines.push('');lines.push('一、基础信息');
+      lines.push('店铺名称：'+(shopName||'未填写'));
+      lines.push('城市区域：'+(currentLocationText()||'未填写'));
+      lines.push('行业类型：'+getVal('行业大类')+' / '+getVal('细分类型'));
+      lines.push('月营业额：'+getVal('月营业额'));
+      lines.push('月租金：'+getVal('月租金'));
+      lines.push('员工人数：'+getVal('员工人数'));
+      lines.push('');lines.push('二、经营阶段');
+      lines.push('当前阶段：'+getVal('经营阶段'));
+      lines.push('近30天趋势：'+getVal('近30天趋势'));
+      lines.push('');lines.push('三、六大维度关键答案');
+      CORE.forEach(function(q) { lines.push(q.dim+'｜'+q.field+'：'+getVal(q.field)); });
+      lines.push('');lines.push('四、行业专属答案');
+      (SPECIAL[currentIndustry]||SPECIAL['其他实体店']).forEach(function(x) { lines.push(x[0]+'：'+getVal(x[0])); });
+      lines.push('');lines.push('五、优先问题与需求');
+      lines.push('优先解决问题：'+getVal('优先解决问题'));
+      lines.push('后续需求：'+getVal('后续需求'));
+      lines.push('期望利润提升：'+getVal('期望利润提升'));
+      lines.push('联系方式：'+(contact||'未填写'));
+      lines.push('');lines.push('六、初步风险标签');
+      lines.push((r2.risk.length?r2.risk:['暂无明显高风险标签，需结合数据复核']).join('、'));
+      resultContent.textContent = lines.join('\n');
+      tags.innerHTML = [...r2.tags.map(function(t) { return '<span class="tag good">'+t+'</span>'; }), ...r2.risk.map(function(t) { return '<span class="tag risk">'+t+'</span>'; })].join('') || '<span class="tag">待进一步分析</span>';
+      btn.textContent = '✅ 提交成功';
+      modal.classList.add('show');
+    })
+    .catch(function(err) {
+      alert('数据保存失败，请检查网络后重试：'+err.message);
+      btn.disabled = false;
+      btn.textContent = btnText;
+    });
 }
 function copyResult(){navigator.clipboard.writeText(resultContent.textContent).then(()=>alert('已复制，可发送给顾问'));}
 function closeModal(){modal.classList.remove('show')}
