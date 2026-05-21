@@ -4,8 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>实体店经营自诊表</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
-  </script>
+  <!-- Supabase SDK 将在提交时动态加载 -->
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -634,11 +633,29 @@
   </div>
 
   <script>
-    // ===== 初始化 Supabase =====
-    // ⚠️ 部署前请替换为你的 Supabase 项目配置
+    // ===== 初始化 Supabase（动态加载，不阻塞页面渲染） =====
     const SUPABASE_URL = 'https://quncytlifkaqcgpmjmeh.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF1bmN5dGxpZmthcWNncG1qbWVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzNjgxMTYsImV4cCI6MjA5NDk0NDExNn0.xhGD9zWq5JwQA_KNhW9bbvo3Mg5cLlCHWTKLbInjZsc';
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    let supabaseClient = null;
+
+    function getSupabase() {
+      return new Promise(function(resolve, reject) {
+        if (supabaseClient) { resolve(supabaseClient); return; }
+        if (typeof window.supabase !== 'undefined') {
+          supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+          resolve(supabaseClient);
+          return;
+        }
+        var s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+        s.onload = function() {
+          supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+          resolve(supabaseClient);
+        };
+        s.onerror = function() { reject(new Error('网络加载失败，请检查网络后重试')); };
+        document.head.appendChild(s);
+      });
+    }
 
     // ===== 选项点击交互 =====
     document.querySelectorAll('.option-item').forEach(item => {
@@ -781,7 +798,8 @@
       btn.innerHTML = '<span class="loading"></span> 提交中…';
 
       try {
-        const { error } = await supabase
+        var sb = await getSupabase();
+        var { error } = await sb
           .from('submissions')
           .insert([data]);
 

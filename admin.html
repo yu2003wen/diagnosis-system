@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>管理后台</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif}
 body{background:#f0f2f5;color:#333;min-height:100vh}
@@ -34,19 +33,6 @@ tr:hover td{background:#f8faff}
 .btn-small:hover{background:#f5f5f5}
 .empty{text-align:center;padding:60px 20px;color:#999}
 .loading{text-align:center;padding:60px;color:#888}
-.stat-bar{display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap}
-.stat-card{background:#fff;border-radius:8px;padding:12px 20px;text-align:center;flex:1;min-width:100px}
-.stat-card .num{font-size:24px;font-weight:700;color:#1F4E79}
-.stat-card .label{font-size:12px;color:#888}
-.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;padding:40px 20px;overflow-y:auto}
-.modal.show{display:block}
-.modal-inner{background:#fff;border-radius:12px;max-width:600px;margin:0 auto;padding:24px;position:relative}
-.modal-close{position:absolute;top:12px;right:16px;font-size:24px;cursor:pointer;color:#999;background:none;border:none}
-.modal-inner h2{font-size:18px;color:#1F4E79;margin-bottom:16px}
-.grid{display:grid;grid-template-columns:100px 1fr;gap:4px 12px;font-size:13px;margin-bottom:16px}
-.grid .k{color:#888}
-.select-status{margin-top:12px}
-.select-status select{padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px}
 </style>
 </head>
 <body>
@@ -56,7 +42,7 @@ tr:hover td{background:#f8faff}
     <h1>管理后台</h1>
     <form id="loginForm">
       <input type="password" id="loginPassword" placeholder="管理员密码" required>
-      <button type="submit">进入后台</button>
+      <button type="submit" id="loginBtn">进入后台</button>
       <div class="login-error" id="loginError">密码错误</div>
     </form>
   </div>
@@ -68,7 +54,7 @@ tr:hover td{background:#f8faff}
     <button class="btn-logout" id="btnLogout">退出</button>
   </div>
   <div class="content">
-    <div class="stat-bar" id="stats"></div>
+    <div id="stats" style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap"></div>
     <div style="margin-bottom:12px">
       <select id="filterStatus" style="padding:6px 10px;border:1px solid #ddd;border-radius:4px;font-size:13px">
         <option value="all">全部</option>
@@ -77,41 +63,29 @@ tr:hover td{background:#f8faff}
         <option value="processing">处理中</option>
         <option value="completed">已完成</option>
       </select>
-      <button class="btn-small" id="btnRefresh" style="margin-left:8px">刷新</button>
+      <button style="padding:6px 12px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;margin-left:8px" id="btnRefresh">刷新</button>
     </div>
     <div class="loading" id="loadingState">加载中...</div>
-    <div class="empty" id="emptyState" style="display:none"><h3>暂无数据</h3><p>客户提交表单后数据会显示在这里</p></div>
+    <div class="empty" id="emptyState" style="display:none"><h3>暂无数据</h3></div>
     <table id="dataTable" style="display:none">
-      <thead><tr>
-        <th>时间</th><th>店铺</th><th>客户</th><th>手机</th><th>状态</th><th>操作</th>
-      </tr></thead>
+      <thead><tr><th>时间</th><th>店铺</th><th>客户</th><th>手机</th><th>状态</th><th>操作</th></tr></thead>
       <tbody id="tableBody"></tbody>
     </table>
   </div>
 </div>
 
-<div class="modal" id="modalOverlay">
-  <div class="modal-inner" id="modalInner">
-    <button class="modal-close" id="modalClose">&times;</button>
-    <h2 id="modalTitle">详情</h2>
-    <div id="modalBody"></div>
-  </div>
-</div>
-
 <script>
-const SUPABASE_URL = 'https://quncytlifkaqcgpmjmeh.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF1bmN5dGxpZmthcWNncG1qbWVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzNjgxMTYsImV4cCI6MjA5NDk0NDExNn0.xhGD9zWq5JwQA_KNhW9bbvo3Mg5cLlCHWTKLbInjZsc';
+// ===== 密码验证（不依赖任何外部加载） =====
 const ADMIN_PASSWORD = 'admin888';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-let allData = [];
 
 document.getElementById('loginForm').onsubmit = function(e) {
   e.preventDefault();
   if (document.getElementById('loginPassword').value === ADMIN_PASSWORD) {
-    sessionStorage.setItem('logged', '1');
     document.getElementById('loginPage').style.display = 'none';
     document.getElementById('appLayout').style.display = 'block';
-    loadData();
+    sessionStorage.setItem('logged', '1');
+    // 现在再加载 Supabase
+    loadSupabaseScript();
   } else {
     document.getElementById('loginError').style.display = 'block';
   }
@@ -123,48 +97,67 @@ document.getElementById('btnLogout').onclick = function() {
   document.getElementById('appLayout').style.display = 'none';
 };
 
+// 恢复登录状态
 if (sessionStorage.getItem('logged') === '1') {
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('appLayout').style.display = 'block';
-  loadData();
+  loadSupabaseScript();
 }
 
-document.getElementById('filterStatus').onchange = render;
-document.getElementById('btnRefresh').onclick = loadData;
-document.getElementById('modalClose').onclick = function() {
-  document.getElementById('modalOverlay').classList.remove('show');
-};
-document.getElementById('modalOverlay').onclick = function(e) {
-  if (e.target === this) this.classList.remove('show');
-};
+// ===== 动态加载 Supabase SDK =====
+function loadSupabaseScript() {
+  var script = document.createElement('script');
+  script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+  script.onload = function() {
+    startApp();
+  };
+  script.onerror = function() {
+    document.getElementById('loadingState').textContent = '⚠️ 网络加载失败，请检查网络连接后刷新页面';
+  };
+  document.head.appendChild(script);
+}
+
+// ===== 启动应用 =====
+var supabase;
+var allData = [];
+
+function startApp() {
+  supabase = window.supabase.createClient(
+    'https://quncytlifkaqcgpmjmeh.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF1bmN5dGxpZmthcWNncG1qbWVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkzNjgxMTYsImV4cCI6MjA5NDk0NDExNn0.xhGD9zWq5JwQA_KNhW9bbvo3Mg5cLlCHWTKLbInjZsc'
+  );
+  document.getElementById('filterStatus').onchange = render;
+  document.getElementById('btnRefresh').onclick = loadData;
+  loadData();
+}
 
 async function loadData() {
   document.getElementById('loadingState').style.display = 'block';
   document.getElementById('dataTable').style.display = 'none';
   document.getElementById('emptyState').style.display = 'none';
   try {
-    const { data, error } = await supabase.from('submissions').select('*').order('created_at', { ascending: false });
-    if (error) throw error;
-    allData = data || [];
+    var res = await supabase.from('submissions').select('*').order('created_at', { ascending: false });
+    if (res.error) throw res.error;
+    allData = res.data || [];
     render();
   } catch(e) {
-    document.getElementById('loadingState').textContent = '加载失败，请刷新重试';
+    document.getElementById('loadingState').textContent = '⚠️ 数据加载失败：' + e.message;
   }
   document.getElementById('loadingState').style.display = 'none';
 }
 
 function render() {
-  const f = document.getElementById('filterStatus').value;
-  let list = f === 'all' ? allData : allData.filter(d => d.status === f);
-  const total = allData.length;
-  const n = allData.filter(d => !d.status || d.status === 'new').length;
-  const p = allData.filter(d => d.status === 'processing').length;
-  const c = allData.filter(d => d.status === 'completed').length;
+  var f = document.getElementById('filterStatus').value;
+  var list = f === 'all' ? allData : allData.filter(function(d) { return d.status === f; });
+  var total = allData.length;
+  var n = allData.filter(function(d) { return !d.status || d.status === 'new'; }).length;
+  var p = allData.filter(function(d) { return d.status === 'processing'; }).length;
+  var c = allData.filter(function(d) { return d.status === 'completed'; }).length;
   document.getElementById('stats').innerHTML =
-    '<div class="stat-card"><div class="num">'+total+'</div><div class="label">全部</div></div>' +
-    '<div class="stat-card"><div class="num">'+n+'</div><div class="label">待处理</div></div>' +
-    '<div class="stat-card"><div class="num">'+p+'</div><div class="label">处理中</div></div>' +
-    '<div class="stat-card"><div class="num">'+c+'</div><div class="label">已完成</div></div>';
+    '<div style="background:#fff;border-radius:8px;padding:12px 20px;text-align:center;flex:1;min-width:80px"><div style="font-size:24px;font-weight:700;color:#1F4E79">'+total+'</div><div style="font-size:12px;color:#888">全部</div></div>' +
+    '<div style="background:#fff;border-radius:8px;padding:12px 20px;text-align:center;flex:1;min-width:80px"><div style="font-size:24px;font-weight:700;color:#e65100">'+n+'</div><div style="font-size:12px;color:#888">待处理</div></div>' +
+    '<div style="background:#fff;border-radius:8px;padding:12px 20px;text-align:center;flex:1;min-width:80px"><div style="font-size:24px;font-weight:700;color:#7b1fa2">'+p+'</div><div style="font-size:12px;color:#888">处理中</div></div>' +
+    '<div style="background:#fff;border-radius:8px;padding:12px 20px;text-align:center;flex:1;min-width:80px"><div style="font-size:24px;font-weight:700;color:#2e7d32">'+c+'</div><div style="font-size:12px;color:#888">已完成</div></div>';
   if (list.length === 0) {
     document.getElementById('dataTable').style.display = 'none';
     document.getElementById('emptyState').style.display = 'block';
@@ -172,12 +165,12 @@ function render() {
   }
   document.getElementById('dataTable').style.display = 'table';
   document.getElementById('emptyState').style.display = 'none';
-  let html = '';
+  var html = '';
   list.forEach(function(d) {
-    const st = (!d.status || d.status === 'new') ? 's-new' : d.status === 'read' ? 's-read' : d.status === 'processing' ? 's-progress' : 's-done';
-    const sl = (!d.status || d.status === 'new') ? '待处理' : d.status === 'read' ? '已读' : d.status === 'processing' ? '处理中' : '已完成';
-    const t = d.created_at ? new Date(d.created_at).toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '-';
-    html += '<tr><td>'+t+'</td><td><b>'+esc(d.store_name)+'</b></td><td>'+esc(d.owner_name)+'</td><td>'+esc(d.phone)+'</td><td><span class="status-badge '+st+'">'+sl+'</span></td><td><button class="btn-small" onclick="viewDetail(\''+d.id+'\')">详情</button></td></tr>';
+    var sc = (!d.status || d.status === 'new') ? 's-new' : d.status === 'read' ? 's-read' : d.status === 'processing' ? 's-progress' : 's-done';
+    var sl = (!d.status || d.status === 'new') ? '待处理' : d.status === 'read' ? '已读' : d.status === 'processing' ? '处理中' : '已完成';
+    var t = d.created_at ? new Date(d.created_at).toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '-';
+    html += '<tr><td>'+esc(t)+'</td><td><b>'+esc(d.store_name)+'</b></td><td>'+esc(d.owner_name)+'</td><td>'+esc(d.phone)+'</td><td><span class="status-badge '+sc+'">'+sl+'</span></td><td><button class="btn-small" onclick="viewDetail(\''+d.id+'\')">详情</button></td></tr>';
   });
   document.getElementById('tableBody').innerHTML = html;
 }
@@ -192,10 +185,8 @@ async function viewDetail(id) {
     d.status = 'read';
     render();
   }
-  document.getElementById('modalTitle').textContent = d.store_name + ' - 详细数据';
-  var html = '<div class="grid">';
   var fields = [
-    ['店铺名称', d.store_name], ['老板', d.owner_name], ['手机', d.phone],
+    ['店铺', d.store_name], ['老板', d.owner_name], ['手机', d.phone],
     ['品类', d.category], ['开业', d.open_time], ['员工', d.employees],
     ['月营业额', d.monthly_revenue], ['月租', d.rent], ['位置', d.location],
     ['客流', d.q1_flow_people], ['客流原因', d.q2_flow_reason], ['客流统计', d.q3_flow_tracking],
@@ -207,27 +198,50 @@ async function viewDetail(id) {
     ['最大问题', d.main_problem], ['期望增收', d.expected_gain], ['自诊', d.self_diagnosis],
     ['备注', d.notes]
   ];
+  var html = '<div style="display:grid;grid-template-columns:100px 1fr;gap:6px 12px;font-size:13px">';
   fields.forEach(function(f) {
-    if (f[1]) { html += '<span class="k">'+f[0]+'</span><span>'+esc(f[1])+'</span>'; }
+    if (f[1]) { html += '<span style="color:#888">'+esc(f[0])+'</span><span>'+esc(f[1])+'</span>'; }
   });
   html += '</div>';
-  html += '<div class="select-status"><span>状态：</span><select onchange="updateStatus(\''+d.id+'\',this.value)">';
-  var sts = [['new','待处理'],['read','已读'],['processing','处理中'],['completed','已完成']];
-  sts.forEach(function(s) {
-    var sel = (d.status||'new') === s[0] ? 'selected' : '';
-    html += '<option value="'+s[0]+'" '+sel+'>'+s[1]+'</option>';
-  });
-  html += '</select></div>';
+  html += '<div style="margin-top:16px"><span style="font-size:13px;font-weight:500">状态：</span>' +
+    '<select onchange="updateStatus(\''+d.id+'\',this.value)" style="padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:13px">' +
+    '<option value="new"'+(d.status==='new'||!d.status?' selected':'')+'>待处理</option>' +
+    '<option value="read"'+(d.status==='read'?' selected':'')+'>已读</option>' +
+    '<option value="processing"'+(d.status==='processing'?' selected':'')+'>处理中</option>' +
+    '<option value="completed"'+(d.status==='completed'?' selected':'')+'>已完成</option>' +
+    '</select></div>';
   document.getElementById('modalBody').innerHTML = html;
   document.getElementById('modalOverlay').classList.add('show');
 }
 
 async function updateStatus(id, status) {
-  await supabase.from('submissions').update({status:status}).eq('id', id);
-  var d = allData.find(function(x) { return x.id === id; });
-  if (d) d.status = status;
-  render();
+  try {
+    await supabase.from('submissions').update({status:status}).eq('id', id);
+    var d = allData.find(function(x) { return x.id === id; });
+    if (d) d.status = status;
+    render();
+  } catch(e) {
+    alert('更新失败：'+e.message);
+  }
 }
+
+// 弹窗控制
+document.getElementById('modalClose').onclick = function() {
+  document.getElementById('modalOverlay').classList.remove('show');
+};
+document.getElementById('modalOverlay').onclick = function(e) {
+  if (e.target === this) this.classList.remove('show');
+};
 </script>
+
+<!-- 弹窗 -->
+<div class="modal" id="modalOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;padding:40px 20px;overflow-y:auto">
+  <div style="background:#fff;border-radius:12px;max-width:600px;margin:0 auto;padding:24px;position:relative">
+    <button id="modalClose" style="position:absolute;top:12px;right:16px;font-size:24px;cursor:pointer;color:#999;background:none;border:none">&times;</button>
+    <h2 id="modalTitle" style="font-size:18px;color:#1F4E79;margin-bottom:16px">详情</h2>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
 </body>
 </html>
